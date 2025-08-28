@@ -8,3 +8,5 @@ __pycache__/
 
 # Arquivo de variáveis de ambiente
 .env
+
+.idea/
