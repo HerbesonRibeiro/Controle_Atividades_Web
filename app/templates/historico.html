@@ -94,12 +94,19 @@
                     {% for atividade in lista_atividades %}
                     <tr>
                         <td><input type="checkbox" name="selecao_ids" value="{{ atividade.id }}" class="row-checkbox"></td>
+
                         <td>{{ atividade.data_atendimento.strftime('%d/%m/%Y %H:%M') if atividade.data_atendimento }}</td>
+
                         <td>{{ atividade.tipo_atendimento }}</td>
-                        <td class="truncate">{{ atividade.descricao }}</td>
-                        <td>{{ atividade.colaborador_nome }}</td>
-                        <td>{{ atividade.status }}</td>
+
                         <td>{{ atividade.nivel_complexidade }}</td>
+
+                        <td class="truncate">{{ atividade.descricao }}</td>
+
+                        <td>{{ atividade.colaborador_nome }}</td>
+
+                        <td>{{ atividade.status }}</td>
+
                         <td class="actions-cell">
                             <button type="button" class="btn-action btn-details"
                                     data-id="{{ atividade.id }}"

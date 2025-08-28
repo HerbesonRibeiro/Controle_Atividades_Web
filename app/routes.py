@@ -32,6 +32,9 @@ def index():
     return render_template('home.html')
 
 # ROTA DO HISTÓRICO AGORA EM (/historico)
+# Em app/routes.py
+import math  # Garanta que math está importado no topo do seu arquivo
+
 
 @app.route('/historico')
 def historico():
@@ -40,7 +43,7 @@ def historico():
 
     # --- LÓGICA DE PAGINAÇÃO ---
     page = request.args.get('page', 1, type=int)
-    PER_PAGE = 25  # Quantos itens por página
+    PER_PAGE = 25
     offset = (page - 1) * PER_PAGE
 
     # --- Busca de dados para os filtros ---
@@ -69,19 +72,47 @@ def historico():
         where_clauses.append("s.gestor_id = %s")
         params.append(user_id)
 
-    # Adicionando filtros da URL
-    filtros_aplicados = {k: v for k, v in request.args.items() if k != 'page'}
-    if filtros_aplicados.get('tipo_filtro'):
+    # --- CONSTRUÇÃO DOS FILTROS ---
+    # Pega todos os filtros da URL que não estão vazios
+    filtros_aplicados = {k: v for k, v in request.args.items() if k != 'page' and v}
+
+    # Filtro por Tipo de Atendimento (já existia)
+    if 'tipo_filtro' in filtros_aplicados:
         where_clauses.append("t.nome = %s")
         params.append(filtros_aplicados['tipo_filtro'])
-    # ... adicione aqui os outros 'if' para os demais filtros: data, colaborador, setor, descricao ...
-    # (O código para os outros filtros que já fizemos continua o mesmo)
+
+    # --- FILTROS ADICIONADOS ---
+    # Filtro por Data de Início
+    if 'data_ini' in filtros_aplicados:
+        where_clauses.append("a.data_atendimento >= %s")
+        params.append(filtros_aplicados['data_ini'])
+
+    # Filtro por Data de Fim
+    if 'data_fim' in filtros_aplicados:
+        # Adicionamos ' 23:59:59' para incluir o dia inteiro
+        where_clauses.append("a.data_atendimento <= %s")
+        params.append(f"{filtros_aplicados['data_fim']} 23:59:59")
+
+    # Filtro por Colaborador
+    if 'colaborador_filtro' in filtros_aplicados:
+        where_clauses.append("a.colaborador_id = %s")
+        params.append(filtros_aplicados['colaborador_filtro'])
+
+    # Filtro por Setor
+    if 'setor_filtro' in filtros_aplicados:
+        where_clauses.append("c.setor_id = %s")
+        params.append(filtros_aplicados['setor_filtro'])
+
+    # Filtro por Descrição
+    if 'descricao_filtro' in filtros_aplicados:
+        where_clauses.append("a.descricao ILIKE %s")
+        params.append(f"%{filtros_aplicados['descricao_filtro']}%")
 
     where_sql = ""
     if where_clauses:
         where_sql = " WHERE " + " AND ".join(where_clauses)
 
-    # --- Query para CONTAR o total de registros (para saber o total de páginas) ---
+    # --- Query para CONTAR o total de registros ---
     count_query = "SELECT COUNT(a.id)" + base_query_from + where_sql
     total_records = db.execute_query(count_query, tuple(params), fetch='one')['count']
     total_pages = math.ceil(total_records / PER_PAGE)
@@ -101,9 +132,6 @@ def historico():
                            filtros_aplicados=filtros_aplicados,
                            current_page=page,
                            total_pages=total_pages)
-
-
-# Em app/routes.py
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
