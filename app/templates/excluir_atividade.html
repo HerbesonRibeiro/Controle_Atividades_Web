@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Confirmar Exclusão{% endblock %}
+
+{% block content %}
+    <h1><i class="fas fa-exclamation-triangle icon-title" style="color: #dc3545;"></i> Confirmar Exclusão</h1>
+
+    <div class="info-card">
+        <p>Você tem certeza que deseja excluir permanentemente a seguinte atividade?</p>
+
+        <div style="background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <p><strong>ID:</strong> {{ atividade.id }}</p>
+            <p><strong>Data:</strong> {{ atividade.data_atendimento.strftime('%d/%m/%Y') if atividade.data_atendimento }}</p>
+            <p><strong>Tipo:</strong> {{ atividade.tipo_atendimento }}</p>
+            <p><strong>Descrição:</strong> {{ atividade.descricao }}</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('excluir_atividade', id=atividade.id) }}">
+            <div class="form-row form-buttons">
+                <a href="{{ url_for('historico') }}" class="btn-secondary">Cancelar</a>
+                <button type="submit" class="btn-delete">Sim, Excluir Permanentemente</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

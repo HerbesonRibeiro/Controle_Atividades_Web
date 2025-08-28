@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Página Inicial{% endblock %}
+
+{% block content %}
+    <div class="welcome-container">
+        <div class="welcome-message">
+            <h1>Bem Vindo, {{ session['colaborador_nome'] }}!</h1>
+        </div>
+
+        <div class="prompt-message">
+            <p>← Escolha uma opção no menu ao lado para começar.</p>
+        </div>
+    </div>
+{% endblock %}

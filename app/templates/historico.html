@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Histórico de Atividades{% endblock %}
+
+{% block content %}
+    <h1><i class="fas fa-history icon-title"></i> Histórico de Atividades</h1>
+
+    <div class="info-card">
+        <form method="GET" action="{{ url_for('historico') }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="tipo_filtro">Tipo de Atendimento:</label>
+                    <select name="tipo_filtro" id="tipo_filtro">
+                        <option value="">Todos</option>
+                        {% for tipo in tipos_atendimento %}
+                            <option value="{{ tipo.nome }}" {% if tipo.nome == filtros_aplicados.tipo %}selected{% endif %}>
+                                {{ tipo.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="data_ini">De:</label>
+                    <input type="date" name="data_ini" id="data_ini" value="{{ filtros_aplicados.data_ini }}">
+                </div>
+                <div class="form-group">
+                    <label for="data_fim">Até:</label>
+                    <input type="date" name="data_fim" id="data_fim" value="{{ filtros_aplicados.data_fim }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="colaborador_filtro">Colaborador:</label>
+                    <select name="colaborador_filtro" id="colaborador_filtro">
+                        <option value="">Todos</option>
+                        {% for colaborador in lista_colaboradores %}
+                            <option value="{{ colaborador.id }}" {% if colaborador.id|string == filtros_aplicados.colaborador %}selected{% endif %}>
+                                {{ colaborador.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="setor_filtro">Setor:</label>
+                    <select name="setor_filtro" id="setor_filtro">
+                        <option value="">Todos</option>
+                        {% for setor in lista_setores %}
+                            <option value="{{ setor.id }}" {% if setor.id|string == filtros_aplicados.setor %}selected{% endif %}>
+                                {{ setor.nome_setor }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="descricao_filtro">Buscar na Descrição:</label>
+                    <input type="text" name="descricao_filtro" id="descricao_filtro" value="{{ filtros_aplicados.descricao }}" placeholder="Digite uma palavra-chave...">
+                </div>
+            </div>
+            <div class="form-row form-buttons">
+                <a href="{{ url_for('historico') }}" class="btn-secondary btn-small">Limpar Filtros</a>
+                <button type="submit" class="btn-primary btn-small">Filtrar</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="info-card">
+        <form id="bulk-action-form" method="POST" action="{{ url_for('excluir_massa') }}">
+
+            <div class="action-bar">
+                <div class="action-buttons">
+                    <button type="button" id="edit-selected-btn" class="btn-action btn-edit" disabled>
+                        <i class="fas fa-pencil-alt"></i> Editar
+                    </button>
+                    <button type="submit" id="delete-selected-btn" class="btn-action btn-delete" disabled>
+                        <i class="fas fa-trash-alt"></i> Excluir Selecionados
+                    </button>
+                </div>
+                <div id="selection-counter" class="selection-counter">Nenhum item selecionado</div>
+            </div>
+
+            <table class="table-uppercase">
+                <thead>
+                    <tr>
+                        <th style="width: 30px;"><input type="checkbox" id="select-all-checkbox"></th>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Nível</th> <th>Descrição</th>
+                        <th>Colaborador</th>
+                        <th>Status</th>
+                        <th style="width: 80px; text-align: center;">Detalhes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for atividade in lista_atividades %}
+                    <tr>
+                        <td><input type="checkbox" name="selecao_ids" value="{{ atividade.id }}" class="row-checkbox"></td>
+                        <td>{{ atividade.data_atendimento.strftime('%d/%m/%Y %H:%M') if atividade.data_atendimento }}</td>
+                        <td>{{ atividade.tipo_atendimento }}</td>
+                        <td class="truncate">{{ atividade.descricao }}</td>
+                        <td>{{ atividade.colaborador_nome }}</td>
+                        <td>{{ atividade.status }}</td>
+                        <td>{{ atividade.nivel_complexidade }}</td>
+                        <td class="actions-cell">
+                            <button type="button" class="btn-action btn-details"
+                                    data-id="{{ atividade.id }}"
+                                    data-data="{{ atividade.data_atendimento.strftime('%d/%m/%Y %H:%M') if atividade.data_atendimento }}"
+                                    data-tipo="{{ atividade.tipo_atendimento }}"
+                                    data-colaborador="{{ atividade.colaborador_nome }}"
+                                    data-status="{{ atividade.status }}"
+                                    data-descricao="{{ atividade.descricao }}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align: center;">Nenhuma atividade encontrada.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </form>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if current_page > 1 %}
+            <a href="{{ url_for('historico', page=current_page-1, **filtros_aplicados) }}">&laquo;</a>
+        {% else %}
+            <span class="disabled">&laquo;</span>
+        {% endif %}
+
+        {% for page_num in range(1, total_pages + 1) %}
+            {% if page_num == current_page %}
+                <span class="active">{{ page_num }}</span>
+            {% else %}
+                <a href="{{ url_for('historico', page=page_num, **filtros_aplicados) }}">{{ page_num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if current_page < total_pages %}
+            <a href="{{ url_for('historico', page=current_page+1, **filtros_aplicados) }}">&raquo;</a>
+        {% else %}
+            <span class="disabled">&raquo;</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div id="details-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close" id="close-details-modal-btn">&times;</button>
+            <h2><i class="fas fa-info-circle icon-title"></i> Detalhes da Atividade</h2>
+            <div id="modal-body">
+                </div>
+        </div>
+    </div>
+{% endblock %}

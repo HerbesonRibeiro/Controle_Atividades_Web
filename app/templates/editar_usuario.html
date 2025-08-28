@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Usuário{% endblock %}
+
+{% block content %}
+<div class="gestao-header">
+    <h1><i class="fas fa-user-edit icon-title"></i> Editar Usuário</h1>
+    <a href="{{ url_for('gestao_usuarios') }}" class="btn-secondary">
+        <i class="fas fa-arrow-left"></i> Voltar
+    </a>
+</div>
+<div class="info-card">
+    <form method="POST" action="{{ url_for('editar_usuario', id=usuario.id) }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="nome">Nome Completo</label>
+                <input type="text" id="nome" name="nome" value="{{ usuario.nome }}" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" value="{{ usuario.email }}" required>
+            </div>
+            <div class="form-group">
+                <label for="usuario">Usuário</label>
+                <input type="text" id="usuario" name="usuario" value="{{ usuario.usuario }}" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="setor">Setor</label>
+                <select id="setor" name="setor" required>
+                    <option value="">Selecione o setor...</option>
+                    {% for setor in setores %}
+                    <option value="{{ setor.id }}" {% if setor.id == usuario.setor_id %}selected{% endif %}>
+                        {{ setor.nome_setor }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="perfil">Perfil</label>
+                <select id="perfil" name="perfil" required>
+                    <option value="">Selecione o perfil...</option>
+                    {% for perfil in perfis %}
+                    <option value="{{ perfil.id }}" {% if perfil.id == usuario.perfil_id %}selected{% endif %}>
+                        {{ perfil.nome }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="cargo">Cargo</label>
+                <select id="cargo" name="cargo" required>
+                    <option value="">Selecione o cargo...</option>
+                    {% for cargo in cargos %}
+                    <option value="{{ cargo.cargo }}" {% if cargo.cargo == usuario.cargo %}selected{% endif %}>
+                        {{ cargo.cargo }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="status">Status</label>
+                <select id="status" name="status" required>
+                    <option value="Ativo" {% if usuario.status == 'Ativo' %}selected{% endif %}>Ativo</option>
+                    <option value="Inativo" {% if usuario.status == 'Inativo' %}selected{% endif %}>Inativo</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="nova_senha">Nova Senha (opcional)</label>
+                <input type="password" id="nova_senha" name="nova_senha" placeholder="Deixe em branco para manter a atual">
+            </div>
+        </div>
+
+        <div class="form-row form-buttons">
+            <a href="{{ url_for('gestao_usuarios') }}" class="btn-secondary">Cancelar</a>
+            <button type="submit" class="btn-primary">Salvar Alterações</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

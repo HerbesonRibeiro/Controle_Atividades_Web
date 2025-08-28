@@ -1,0 +1,52 @@
+<div class="form-row">
+    <div class="form-group" style="flex: 0 0 200px;">
+        <label for="data_atendimento">Data</label>
+        <input type="date" id="data_atendimento" name="data_atendimento"
+               value="{{ atividade.data_atendimento.strftime('%Y-%m-%d') if atividade else data_atual }}" required>
+    </div>
+    <div class="form-group" style="flex: 1;">
+        <label for="tipo_atendimento">Tipo de Atendimento</label>
+        <select id="tipo_atendimento" name="tipo_atendimento" required>
+            <option value="" disabled>Selecione um tipo...</option>
+            {% for tipo in tipos_atendimento %}
+                <option value="{{ tipo.id }}" {% if atividade and atividade.tipo_atendimento_id == tipo.id %}selected{% endif %}>
+                    {{ tipo.nome }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+<div class="form-row">
+    <div class="form-group">
+        <label for="nivel_complexidade">Nível</label>
+        <select id="nivel_complexidade" name="nivel_complexidade">
+            {% set niveis = ['baixo', 'medio', 'grave', 'gravissimo'] %}
+            {% for nivel_val in niveis %}
+                <option value="{{ nivel_val }}" {% if atividade and atividade.nivel_complexidade == nivel_val %}selected{% endif %}>
+                    {{ nivel_val|capitalize }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status" required>
+            {% set statuses = ['RESOLVIDO', 'FECHADO', 'PENDENTE', 'ENCAMINHADO'] %}
+            {% for status_val in statuses %}
+                <option value="{{ status_val }}" {% if atividade and atividade.status == status_val %}selected{% endif %}>
+                    {{ status_val|capitalize }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="numero_atendimento">Telefone / N° do Ticket</label>
+        <input type="text" id="numero_atendimento" name="numero_atendimento" value="{{ atividade.numero_atendimento if atividade else '' }}">
+    </div>
+</div>
+<div class="form-row">
+    <div class="form-group">
+        <label for="descricao">Descrição da Atividade</label>
+        <textarea id="descricao" name="descricao" rows="5">{{ atividade.descricao if atividade else '' }}</textarea>
+    </div>
+</div>

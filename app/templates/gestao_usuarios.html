@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Usuários{% endblock %}
+
+{% block content %}
+<div class="gestao-header">
+    <h1><i class="fas fa-users-cog icon-title"></i> Gestão de Usuários</h1>
+    <button class="btn-primary" onclick="abrirModalUsuario()">
+        <i class="fas fa-plus"></i> Novo Usuário
+    </button>
+</div>
+
+<!-- Filtros -->
+<div class="info-card">
+    <form method="GET" action="{{ url_for('gestao_usuarios') }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="setor_filtro">Filtrar por Setor:</label>
+                <select name="setor_filtro" id="setor_filtro">
+                    <option value="">Todos os setores</option>
+                    {% for setor in setores %}
+                    <option value="{{ setor.id }}" {% if setor.id|string == filtros_aplicados.setor %}selected{% endif %}>
+                        {{ setor.nome_setor }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="perfil_filtro">Filtrar por Perfil:</label>
+                <select name="perfil_filtro" id="perfil_filtro">
+                    <option value="">Todos os perfis</option>
+                    {% for perfil in perfis %}
+                    <option value="{{ perfil.id }}" {% if perfil.id|string == filtros_aplicados.perfil %}selected{% endif %}>
+                        {{ perfil.nome }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row form-buttons">
+            <div class="filter-buttons">
+                <a href="{{ url_for('gestao_usuarios') }}" class="btn-filter btn-filter-secondary">Limpar Filtros</a>
+                <button type="submit" class="btn-filter btn-filter-primary">Filtrar</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="info-card">
+    <div class="table-container">
+        <table class="gestao-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Usuário</th>
+                    <th>Setor</th>
+                    <th>Perfil</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                <tr>
+                    <td>{{ usuario.nome }}</td>
+                    <td>{{ usuario.usuario }}</td>
+                    <td>{{ usuario.setor }}</td>
+                    <td>{{ usuario.perfil }}</td>
+                    <td style="text-align: center;">
+                        <span class="status-badge status-{{ usuario.status|lower }}">
+                            {{ usuario.status }}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('editar_usuario', id=usuario.id) }}" class="btn-action btn-edit" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 30px;">
+                        <i class="fas fa-users-slash" style="font-size: 3rem; color: #6c757d; margin-bottom: 15px; opacity: 0.5;"></i>
+                        <p style="color: #6c757d; margin: 0;">
+                            {% if filtros_aplicados.setor or filtros_aplicados.perfil %}
+                                Nenhum usuário encontrado com os filtros aplicados
+                            {% else %}
+                                Nenhum usuário encontrado
+                            {% endif %}
+                        </p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal para novo usuário -->
+<div id="modal-usuario" class="modal-overlay hidden">
+    <div class="modal-content">
+        <button class="modal-close" onclick="fecharModalUsuario()">&times;</button>
+        <h2><i class="fas fa-user-plus"></i> Novo Usuário</h2>
+        <!-- CORRIJA A ACTION DO FORMULÁRIO -->
+        <form method="POST" action="{{ url_for('novo_usuario') }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="nome">Nome Completo</label>
+                    <input type="text" id="nome" name="nome" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="usuario">Usuário</label>
+                    <input type="text" id="usuario" name="usuario" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="setor">Setor</label>
+                    <select id="setor" name="setor" required>
+                        <option value="">Selecione o setor...</option>
+                        {% for setor in setores %}
+                        <option value="{{ setor.id }}">{{ setor.nome_setor }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="perfil">Perfil</label>
+                    <select id="perfil" name="perfil" required>
+                        <option value="">Selecione o perfil...</option>
+                        {% for perfil in perfis %}
+                        <option value="{{ perfil.id }}">{{ perfil.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="cargo">Cargo</label>
+                    <select id="cargo" name="cargo" required>
+                        <option value="">Selecione o cargo...</option>
+                        {% for cargo in cargos %}
+                        <option value="{{ cargo.cargo }}">{{ cargo.cargo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select id="status" name="status" required>
+                        <option value="Ativo">Ativo</option>
+                        <option value="Inativo">Inativo</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="senha">Senha Inicial</label>
+                    <input type="password" id="senha" name="senha" required minlength="6">
+                </div>
+            </div>
+            <div class="form-row form-buttons">
+                <button type="button" class="btn-secondary" onclick="fecharModalUsuario()">Cancelar</button>
+                <button type="submit" class="btn-primary">Criar Usuário</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModalUsuario() {
+    document.getElementById('modal-usuario').classList.remove('hidden');
+}
+
+function fecharModalUsuario() {
+    document.getElementById('modal-usuario').classList.add('hidden');
+}
+
+// Fechar modal clicando fora
+document.getElementById('modal-usuario').addEventListener('click', function(e) {
+    if (e.target === this) {
+        fecharModalUsuario();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Nova Atividade{% endblock %}
+
+{% block content %}
+<div class="registro-atividades-container">
+    <h1><i class="fas fa-plus-circle icon-title"></i> Registrar Nova Atividade</h1>
+
+    <div class="registro-layout">
+        <div class="form-column">
+            <div class="info-card form-card registro-formulario">
+                <form method="POST" action="{{ url_for('registrar_atividade') }}">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 0 0 200px;">
+                            <label for="data_atendimento">Data</label>
+                            <input type="date" id="data_atendimento" name="data_atendimento" value="{{ data_atual }}" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="tipo_atendimento">Tipo de Atendimento</label>
+                            <select id="tipo_atendimento" name="tipo_atendimento" required>
+                                <option value="" disabled selected>Selecione um tipo...</option>
+                                {% for tipo in tipos_atendimento %}
+                                    <option value="{{ tipo.id }}">{{ tipo.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nivel">Nível</label>
+                            <select id="nivel" name="nivel">
+                                <option value="baixo" selected>LEVE</option>
+                                <option value="medio">MÉDIO</option>
+                                <option value="grave">GRAVE</option>
+                                <option value="gravissimo">GRAVÍSSIMO</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <select id="status" name="status" required>
+                                <option value="RESOLVIDO" selected>RESOLVIDO</option>
+                                <option value="FECHADO">FECHADO</option>
+                                <option value="PENDENTE">PENDENTE</option>
+                                <option value="ENCAMINHADO">ENCAMINHADO</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="numero_atendimento">Telefone / N° do Ticket</label>
+                            <input type="text" id="numero_atendimento" name="numero_atendimento" placeholder="Ex: #ead123456">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="descricao">Descrição da Atividade</label>
+                            <textarea id="descricao" name="descricao" rows="5" placeholder="Descreva detalhadamente a atividade realizada..."></textarea>
+                        </div>
+                    </div>
+                    <div class="form-row form-buttons">
+                        <button type="reset" class="btn-secondary">Limpar</button>
+                        <button type="submit" class="btn-primary">Salvar Atividade</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="widgets-column">
+            <div class="info-card">
+                <h3><i class="fas fa-chart-line icon-title"></i> Seu Desempenho</h3>
+                <div class="performance-stats">
+                    <div class="stat-item">
+                        <span>{{ stats.hoje }}</span>
+                        <label>Hoje</label>
+                    </div>
+                    <div class="stat-item">
+                        <span>{{ stats.semana }}</span>
+                        <label>Semana</label>
+                    </div>
+                    <div class="stat-item">
+                        <span>{{ stats.mes }}</span>
+                        <label>Mês</label>
+                    </div>
+                </div>
+            </div>
+            <div class="info-card">
+                <h3><i class="fas fa-user-circle icon-title"></i> Suas Informações</h3>
+                <p><strong>Nome:</strong> {{ colaborador.nome }}</p>
+                <p><strong>Setor:</strong> {{ colaborador.nome_setor }}</p>
+                <p><strong>Função:</strong> {{ colaborador.perfil }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

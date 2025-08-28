@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Setores{% endblock %}
+
+{% block content %}
+<div class="gestao-header">
+    <h1><i class="fas fa-building icon-title"></i> Gestão de Setores</h1>
+    <button class="btn-primary" onclick="abrirModal()">
+        <i class="fas fa-plus"></i> Novo Setor
+    </button>
+</div>
+
+<div class="info-card">
+    <div class="table-container">
+        <table class="gestao-table">
+            <thead>
+                <tr>
+                    <th>Nome do Setor</th>
+                    <th>Gestor Responsável</th>
+                    <th style="width: 15%;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for setor in setores %}
+                <tr>
+                    <td>{{ setor.nome_setor }}</td>
+                    <td>{{ setor.nome_gestor or 'Nenhum gestor definido' }}</td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('editar_setor', id=setor.id) }}" class="btn-action btn-edit" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" style="text-align: center; padding: 30px;">Nenhum setor encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modal-novo-setor" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 500px;">
+        <button class="modal-close" onclick="fecharModal()">&times;</button>
+        <h2><i class="fas fa-plus-circle"></i> Novo Setor</h2>
+        <form method="POST" action="{{ url_for('gestao_setores') }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="nome_setor">Nome do Setor</label>
+                    <input type="text" id="nome_setor" name="nome_setor" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="gestor_id">Gestor do Setor (opcional)</label>
+                    <select id="gestor_id" name="gestor_id">
+                        <option value="">Nenhum</option>
+                        {% for colaborador in colaboradores %}
+                        <option value="{{ colaborador.id }}">{{ colaborador.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row form-buttons">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModal() {
+    document.getElementById('modal-novo-setor').classList.remove('hidden');
+}
+function fecharModal() {
+    document.getElementById('modal-novo-setor').classList.add('hidden');
+}
+document.getElementById('modal-novo-setor').addEventListener('click', function(e) {
+    if (e.target === this) {
+        fecharModal();
+    }
+});
+</script>
+{% endblock %}

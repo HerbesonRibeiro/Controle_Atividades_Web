@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Tipos de Atividades{% endblock %}
+
+{% block content %}
+<div class="gestao-header">
+    <h1><i class="fas fa-tasks icon-title"></i> Gestão de Tipos de Atividades</h1>
+    <button class="btn-primary" onclick="abrirModal()">
+        <i class="fas fa-plus"></i> Novo Tipo
+    </button>
+</div>
+
+<div class="info-card">
+    <form method="GET" action="{{ url_for('gestao_tipos_atividades') }}">
+        <div class="form-row">
+            <div class="form-group" style="flex-grow: 2;">
+                <label for="filtro_nome">Buscar por Nome:</label>
+                <input type="text" name="q" id="filtro_nome" value="{{ filtro_nome or '' }}" placeholder="Digite parte do nome...">
+            </div>
+            <div class="form-group" style="align-self: flex-end;">
+                 <div class="filter-buttons">
+                    <a href="{{ url_for('gestao_tipos_atividades') }}" class="btn-filter btn-filter-secondary">Limpar</a>
+                    <button type="submit" class="btn-filter btn-filter-primary">Buscar</button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="info-card">
+    <div class="table-container">
+        <table class="gestao-table">
+            <thead>
+                <tr>
+                    <th>Nome da Atividade</th>
+                    <th style="width: 15%;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tipo in tipos %}
+                <tr>
+                    <td>{{ tipo.nome }}</td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('editar_tipo_atividade', id=tipo.id) }}" class="btn-action btn-edit" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2" style="text-align: center; padding: 30px;">Nenhum tipo de atividade encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modal-novo-tipo" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 500px;">
+        <button class="modal-close" onclick="fecharModal()">&times;</button>
+        <h2><i class="fas fa-plus-circle"></i> Novo Tipo de Atividade</h2>
+        <form method="POST" action="{{ url_for('gestao_tipos_atividades') }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="nome_atividade">Nome do Tipo de Atividade</label>
+                    <input type="text" id="nome_atividade" name="nome_atividade" required>
+                </div>
+            </div>
+            <div class="form-row form-buttons">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModal() {
+    document.getElementById('modal-novo-tipo').classList.remove('hidden');
+}
+function fecharModal() {
+    document.getElementById('modal-novo-tipo').classList.add('hidden');
+}
+document.getElementById('modal-novo-tipo').addEventListener('click', function(e) {
+    if (e.target === this) {
+        fecharModal();
+    }
+});
+</script>
+{% endblock %}

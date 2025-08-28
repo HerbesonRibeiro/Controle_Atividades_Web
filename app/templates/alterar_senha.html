@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Alterar Senha{% endblock %}
+
+{% block content %}
+<div class="alterar-senha-container">
+    <div class="alterar-senha-card">
+        <div class="alterar-senha-header">
+            <div class="alterar-senha-icon">
+                <i class="fas fa-key"></i>
+            </div>
+            <h1>Alterar Senha</h1>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alterar-senha-alert">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('alterar_senha') }}" id="alterarSenhaForm">
+            <div class="form-row">
+                <div class="form-group password-field">
+                    <label for="senha_atual">Senha Atual</label>
+                    <input type="password" id="senha_atual" name="senha_atual" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('senha_atual')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group password-field">
+                    <label for="nova_senha">Nova Senha</label>
+                    <input type="password" id="nova_senha" name="nova_senha" required
+                           minlength="6" placeholder="Mínimo de 6 caracteres" oninput="checkPasswordStrength()">
+                    <button type="button" class="password-toggle" onclick="togglePassword('nova_senha')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <div class="password-strength">
+                        <div class="strength-meter" id="passwordStrengthMeter"></div>
+                    </div>
+                    <div class="password-strength-text" id="passwordStrengthText"></div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group password-field">
+                    <label for="confirmar_senha">Confirmar Nova Senha</label>
+                    <input type="password" id="confirmar_senha" name="confirmar_senha" required
+                           minlength="6" oninput="checkPasswordMatch()">
+                    <button type="button" class="password-toggle" onclick="togglePassword('confirmar_senha')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <div id="passwordMatchText" style="font-size: 0.8rem; margin-top: 5px;"></div>
+                </div>
+            </div>
+
+            <div class="alterar-senha-buttons">
+                <a href="{{ url_for('perfil') }}" class="btn-secondary btn-cancelar-alterar">Cancelar</a>
+                <button type="submit" class="btn-primary btn-alterar-senha" id="submitBtn">Alterar Senha</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    const toggle = field.nextElementSibling.querySelector('i');
+    if (field.type === 'password') {
+        field.type = 'text';
+        toggle.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        field.type = 'password';
+        toggle.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+
+function checkPasswordStrength() {
+    const password = document.getElementById('nova_senha').value;
+    const meter = document.getElementById('passwordStrengthMeter');
+    const text = document.getElementById('passwordStrengthText');
+
+    let strength = 0;
+    let message = '';
+
+    if (password.length >= 6) strength += 1;
+    if (password.length >= 8) strength += 1;
+    if (/[A-Z]/.test(password)) strength += 1;
+    if (/[0-9]/.test(password)) strength += 1;
+    if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+
+    meter.className = 'strength-meter';
+    if (password.length === 0) {
+        message = '';
+    } else if (strength <= 2) {
+        meter.classList.add('strength-weak');
+        message = 'Senha fraca';
+    } else if (strength <= 4) {
+        meter.classList.add('strength-medium');
+        message = 'Senha média';
+    } else {
+        meter.classList.add('strength-strong');
+        message = 'Senha forte';
+    }
+
+    text.textContent = message;
+}
+
+function checkPasswordMatch() {
+    const password = document.getElementById('nova_senha').value;
+    const confirm = document.getElementById('confirmar_senha').value;
+    const text = document.getElementById('passwordMatchText');
+
+    if (confirm.length === 0) {
+        text.textContent = '';
+    } else if (password === confirm) {
+        text.textContent = 'Senhas coincidem ✓';
+        text.style.color = '#198754';
+    } else {
+        text.textContent = 'Senhas não coincidem ✗';
+        text.style.color = '#dc3545';
+    }
+}
+
+// Adicionar loading no submit
+document.getElementById('alterarSenhaForm').addEventListener('submit', function() {
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.classList.add('loading');
+    submitBtn.innerHTML = 'Alterando...';
+});
+</script>
+{% endblock %}

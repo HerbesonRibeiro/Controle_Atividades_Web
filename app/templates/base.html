@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Controle de Atividades{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="main-header">
+        <div class="header-title">
+            <a href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="header-logo">
+            </a>
+        </div>
+        <nav>
+             {% if session['colaborador_id'] %}
+                <span>Olá, {{ session['colaborador_nome'] }}</span>
+                <a href="{{ url_for('logout') }}">Sair</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <div class="main-layout">
+        <nav class="sidebar">
+            <ul class="sidebar-menu">
+                <li>
+                    <a href="#" class="sidebar-title" id="atividades-menu-toggle">ATIVIDADES</a>
+                    <ul class="sidebar-submenu {{ '' if request.endpoint in ['index', 'historico', 'registrar_atividade'] else 'hidden' }}">
+                        <li><a href="{{ url_for('registrar_atividade') }}" class="{{ 'active' if request.endpoint == 'registrar_atividade' else '' }}">Registrar Atividade</a></li>
+                        <li><a href="{{ url_for('historico') }}" class="{{ 'active' if request.endpoint == 'historico' else '' }}">Histórico de Atividades</a></li>
+                    </ul>
+                </li>
+
+                <li>
+                    <a href="#" class="sidebar-title">PERFIL</a>
+                    <ul class="sidebar-submenu">
+                        <li><a href="{{ url_for('perfil') }}" class="{{ 'active' if request.endpoint == 'perfil' else '' }}">Meu Perfil</a></li>
+                    </ul>
+                </li>
+
+                {% if session.get('colaborador_perfil') == 'Administrador' %}
+                <li>
+                    <a href="#" class="sidebar-title">GESTÃO</a>
+                    <ul class="sidebar-submenu">
+                        <li><a href="{{ url_for('gestao_usuarios') }}" class="{{ 'active' if request.endpoint == 'gestao_usuarios' else '' }}">Gestão de Usuários</a></li>
+                        <li><a href="{{ url_for('gestao_tipos_atividades') }}" class="{{ 'active' if request.endpoint == 'gestao_atividades' else '' }}">Gestão de Atividades</a></li>
+                        <li><a href="{{ url_for('gestao_setores') }}" class="{{ 'active' if request.endpoint in ['gestao_setores', 'editar_setor'] else '' }}">Gestão de Setores</a></li>
+                    </ul>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+
+        <main class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Setor{% endblock %}
+
+{% block content %}
+<div class="gestao-header">
+    <h1><i class="fas fa-edit icon-title"></i> Editar Setor</h1>
+    <a href="{{ url_for('gestao_setores') }}" class="btn-secondary">
+        <i class="fas fa-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="info-card" style="max-width: 600px; margin: 0 auto;">
+    <form method="POST" action="{{ url_for('editar_setor', id=setor.id) }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="nome_setor">Nome do Setor</label>
+                <input type="text" id="nome_setor" name="nome_setor" value="{{ setor.nome_setor }}" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="gestor_id">Gestor do Setor (opcional)</label>
+                <select id="gestor_id" name="gestor_id">
+                    <option value="">Nenhum</option>
+                    {% for colaborador in colaboradores %}
+                    <option value="{{ colaborador.id }}" {% if colaborador.id == setor.gestor_id %}selected{% endif %}>
+                        {{ colaborador.nome }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row form-buttons">
+            <a href="{{ url_for('gestao_setores') }}" class="btn-secondary">Cancelar</a>
+            <button type="submit" class="btn-primary">Salvar Alterações</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
