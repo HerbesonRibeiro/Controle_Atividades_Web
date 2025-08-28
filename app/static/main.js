@@ -125,3 +125,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicia a página com o contador zerado
     updateCounterAndButtons();
 });
+
+// --- Lógica para Notificações Toast ---
+document.addEventListener('DOMContentLoaded', function() {
+    const toasts = document.querySelectorAll('#toast-container .toast');
+
+    toasts.forEach((toast, index) => {
+        // Define um tempo para a notificação desaparecer
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+
+            // Remove o elemento do HTML depois que a animação de saída terminar
+            toast.addEventListener('animationend', () => {
+                toast.remove();
+            });
+
+        }, 5000); // 5000 milissegundos = 5 segundos
+    });
+});
