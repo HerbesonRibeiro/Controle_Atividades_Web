@@ -54,7 +54,8 @@ body {
 .content {
     flex: 1;
     padding: 30px;
-    padding-top: 60px; /* Espaço para a navegação do usuário não sobrepor o título */
+    padding-top: 60px;
+    min-width: 0; /* <-- ADICIONE ESTA LINHA */
 }
 
 /* --- MENU DA SIDEBAR (COM ESPAÇAMENTO CORRIGIDO) --- */
@@ -138,7 +139,13 @@ tbody tr:hover { background-color: #f1f3f5; }
 .modal-close { position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 2rem; color: #6c757d; cursor: pointer; }
 .btn-small { padding: 6px 12px; font-size: 0.9rem; }
 .table-uppercase td { text-transform: uppercase; }
-.pagination { display: flex; justify-content: center; padding: 20px 0; }
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+    flex-wrap: wrap; /* ADICIONADO: Permite que os itens quebrem a linha se necessário */
+}
 .pagination a, .pagination span { color: #0d6efd; padding: 8px 16px; text-decoration: none; border: 1px solid #ddd; margin: 0 4px; border-radius: 4px; }
 .pagination span.active { background-color: #0d6efd; color: white; }
 .pagination span.disabled { color: #ccc; }
@@ -771,11 +778,6 @@ tbody tr:hover { background-color: #f1f3f5; }
     background-color: #c82333;
 }
 
-/* Container da tabela igual ao histórico */
-.table-container {
-    overflow-x: auto;
-}
-
 /* Header da gestão mantendo consistência */
 .gestao-header {
     display: flex;
@@ -957,4 +959,121 @@ tbody tr:hover { background-color: #f1f3f5; }
 
 .toast-close-btn:hover {
     opacity: 1;
+}
+/* --- CONTAINER COM BARRA DE ROLAGEM --- */
+.table-container {
+    width: 100%;
+    overflow-x: auto;   /* Adiciona a barra de rolagem horizontal se a tabela for larga */
+    overflow-y: auto;   /* Adiciona a barra de rolagem vertical se a tabela for alta */
+    max-height: 75vh;   /* A rolagem vertical aparece quando a altura passar de 75% da tela */
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 20px; /* Adiciona um espaço abaixo da tabela */
+}
+
+/* Personaliza a barra de rolagem */
+.table-container::-webkit-scrollbar {
+    height: 10px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 5px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: #0d6efd;
+    border-radius: 5px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: #0b5ed7;
+}
+
+/* --- TABELA COM LARGURA MAIOR --- */
+.table-uppercase {
+    min-width: 1200px; /* Largura bem maior para forçar scroll */
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+/* LARGURAS DAS COLUNAS (aumente algumas) */
+.table-uppercase th:nth-child(1) { width: 50px; }    /* Checkbox */
+.table-uppercase th:nth-child(2) { width: 120px; }   /* Data */
+.table-uppercase th:nth-child(3) { width: 150px; }   /* Tipo */
+.table-uppercase th:nth-child(4) { width: 100px; }   /* Nível */
+.table-uppercase th:nth-child(5) { width: 400px; }   /* Descrição - MAIOR */
+.table-uppercase th:nth-child(6) { width: 200px; }   /* Colaborador */
+.table-uppercase th:nth-child(7) { width: 120px; }   /* Status */
+.table-uppercase th:nth-child(8) { width: 100px; }   /* Ações */
+
+.table-uppercase th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    padding: 12px 8px;
+    text-align: left;
+}
+
+.table-uppercase td {
+    padding: 10px 8px;
+    vertical-align: top;
+}
+
+/* DESCrição com quebra */
+.table-uppercase td:nth-child(5) {
+    word-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
+    line-height: 1.4;
+    max-height: 84px;
+    overflow: hidden;
+}
+
+/* Outras colunas sem quebra */
+.table-uppercase td:not(:nth-child(5)) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* --- ESTILOS PARA O MENU LATERAL RECOLHÍVEL --- */
+
+/* Estilo do botão de controle */
+.sidebar-toggle-wrapper {
+    text-align: right;
+    margin-bottom: 20px; /* Espaço entre o botão e o menu */
+}
+
+.sidebar-toggle-btn {
+    background: #2a2a2a;
+    color: #adb5bd;
+    border: none;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.sidebar-toggle-btn:hover {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+/* Transições suaves para o encolhimento */
+.sidebar, .content {
+    transition: all 0.3s ease-in-out;
+}
+
+/* --- ESTADO RECOLHIDO --- */
+/* A classe .sidebar-collapsed será adicionada ao <body> via JavaScript */
+
+body.sidebar-collapsed .sidebar {
+    flex-basis: 80px; /* Largura do menu encolhido */
+    padding-left: 15px;
+    padding-right: 15px;
 }

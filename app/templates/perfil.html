@@ -15,6 +15,14 @@
             <p><strong>Usuário:</strong> {{ colaborador.usuario }}</p>
             <p><strong>E-mail:</strong> {{ colaborador.email }}</p>
             <p><strong>Setor:</strong> {{ colaborador.nome_setor }}</p>
+            <p>
+            <strong>Gestor do Setor:</strong>
+            {% if colaborador.nome_gestor %}
+                {{ colaborador.nome_gestor }}
+            {% else %}
+                <span style="color: #999;">Não definido</span>
+            {% endif %}
+            </p>
             <p><strong>Função:</strong> {{ colaborador.nome_perfil }}</p>
             <p><strong>Status:</strong> <span class="status-badge status-{{ colaborador.status|lower }}">{{ colaborador.status }}</span></p>
         </div>
