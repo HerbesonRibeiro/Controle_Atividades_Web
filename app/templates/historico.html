@@ -13,7 +13,7 @@
                     <select name="tipo_filtro" id="tipo_filtro">
                         <option value="">Todos</option>
                         {% for tipo in tipos_atendimento %}
-                            <option value="{{ tipo.nome }}" {% if tipo.nome == filtros_aplicados.tipo %}selected{% endif %}>
+                            <option value="{{ tipo.nome }}" {% if tipo.nome == filtros_aplicados.get('tipo_filtro') %}selected{% endif %}>
                                 {{ tipo.nome }}
                             </option>
                         {% endfor %}
@@ -21,11 +21,11 @@
                 </div>
                 <div class="form-group">
                     <label for="data_ini">De:</label>
-                    <input type="date" name="data_ini" id="data_ini" value="{{ filtros_aplicados.data_ini }}">
+                    <input type="date" name="data_ini" id="data_ini" value="{{ filtros_aplicados.get('data_ini', '') }}">
                 </div>
                 <div class="form-group">
                     <label for="data_fim">Até:</label>
-                    <input type="date" name="data_fim" id="data_fim" value="{{ filtros_aplicados.data_fim }}">
+                    <input type="date" name="data_fim" id="data_fim" value="{{ filtros_aplicados.get('data_fim', '') }}">
                 </div>
             </div>
             <div class="form-row">
@@ -34,7 +34,7 @@
                     <select name="colaborador_filtro" id="colaborador_filtro">
                         <option value="">Todos</option>
                         {% for colaborador in lista_colaboradores %}
-                            <option value="{{ colaborador.id }}" {% if colaborador.id|string == filtros_aplicados.colaborador %}selected{% endif %}>
+                            <option value="{{ colaborador.id }}" {% if colaborador.id|string == filtros_aplicados.get('colaborador_filtro') %}selected{% endif %}>
                                 {{ colaborador.nome }}
                             </option>
                         {% endfor %}
@@ -45,7 +45,7 @@
                     <select name="setor_filtro" id="setor_filtro">
                         <option value="">Todos</option>
                         {% for setor in lista_setores %}
-                            <option value="{{ setor.id }}" {% if setor.id|string == filtros_aplicados.setor %}selected{% endif %}>
+                             <option value="{{ setor.id }}" {% if setor.id|string == filtros_aplicados.get('setor_filtro') %}selected{% endif %}>
                                 {{ setor.nome_setor }}
                             </option>
                         {% endfor %}
@@ -53,7 +53,7 @@
                 </div>
                 <div class="form-group">
                     <label for="descricao_filtro">Buscar na Descrição:</label>
-                    <input type="text" name="descricao_filtro" id="descricao_filtro" value="{{ filtros_aplicados.descricao }}" placeholder="Digite uma palavra-chave...">
+                    <input type="text" name="descricao_filtro" id="descricao_filtro" value="{{ filtros_aplicados.get('descricao_filtro', '') }}" placeholder="Digite uma palavra-chave...">
                 </div>
             </div>
             <div class="form-row form-buttons">
@@ -84,10 +84,10 @@
                         <tr>
                             <th style="width: 30px;"><input type="checkbox" id="select-all-checkbox"></th>
                             <th>Data</th>
-                            <th>Tipo</th>
-                            <th>Nível</th>
-                            <th>Descrição</th>
                             <th>Colaborador</th>
+                            <th>Tipo</th>
+                            <th>Nº/ Ticket</th>
+                            <th>Descrição</th>
                             <th>Status</th>
                             <th style="width: 80px; text-align: center;">Detalhes</th>
                         </tr>
@@ -96,11 +96,11 @@
                         {% for atividade in lista_atividades %}
                         <tr>
                             <td><input type="checkbox" name="selecao_ids" value="{{ atividade.id }}" class="row-checkbox"></td>
-                            <td>{{ atividade.data_atendimento.strftime('%d/%m/%Y %H:%M') if atividade.data_atendimento }}</td>
-                            <td>{{ atividade.tipo_atendimento }}</td>
-                            <td>{{ atividade.nivel_complexidade }}</td>
-                            <td class="truncate">{{ atividade.descricao }}</td>
+                            <td>{{ atividade.data_atendimento.strftime('%d/%m/%Y') if atividade.data_atendimento }}</td>
                             <td>{{ atividade.colaborador_nome }}</td>
+                            <td>{{ atividade.tipo_atendimento }}</td>
+                            <td>{{ atividade.numero_atendimento }}</td>
+                            <td class="truncate">{{ atividade.descricao }}</td>
                             <td>{{ atividade.status }}</td>
                             <td class="actions-cell">
                                 <button type="button" class="btn-action btn-details"

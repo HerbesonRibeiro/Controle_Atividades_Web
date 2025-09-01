@@ -118,7 +118,9 @@ h1 { color: #343a40; font-weight: 600; margin-top: 0; font-size: 1.75rem; margin
 .btn-primary { background-color: #0d6efd; color: white; }
 .btn-secondary { background-color: #e9ecef; color: #495057; border: 1px solid #ced4da; }
 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-thead th { background-color: #e9ecef; font-weight: 600; }
+thead th {
+background-color: #dee2e6;
+ font-weight: 600; }
 th, td { padding: 15px; text-align: left; border-top: 1px solid #dee2e6; }
 tbody tr:hover { background-color: #f1f3f5; }
 .alert { padding: 15px; margin-bottom: 20px; border-radius: 8px; }
@@ -998,31 +1000,34 @@ tbody tr:hover { background-color: #f1f3f5; }
     border-collapse: collapse;
     font-size: 0.9rem;
 }
+/* Em app/static/css/style.css */
 
-/* LARGURAS DAS COLUNAS (aumente algumas) */
-.table-uppercase th:nth-child(1) { width: 50px; }    /* Checkbox */
-.table-uppercase th:nth-child(2) { width: 120px; }   /* Data */
-.table-uppercase th:nth-child(3) { width: 150px; }   /* Tipo */
-.table-uppercase th:nth-child(4) { width: 100px; }   /* Nível */
-.table-uppercase th:nth-child(5) { width: 400px; }   /* Descrição - MAIOR */
-.table-uppercase th:nth-child(6) { width: 200px; }   /* Colaborador */
-.table-uppercase th:nth-child(7) { width: 120px; }   /* Status */
-.table-uppercase th:nth-child(8) { width: 100px; }   /* Ações */
+/* LARGURAS DAS COLUNAS (NOVA ORDEM: SEM NÍVEL, COM SETOR) */
+.table-uppercase th:nth-child(1), .table-uppercase td:nth-child(1) { width: 4%; }  /* Checkbox */
+.table-uppercase th:nth-child(2), .table-uppercase td:nth-child(2) { width: 10%; } /* Data */
+.table-uppercase th:nth-child(3), .table-uppercase td:nth-child(3) { width: 25%; } /* Colaborador */
+.table-uppercase th:nth-child(4), .table-uppercase td:nth-child(4) { width: 25%; } /* Tipo */
+.table-uppercase th:nth-child(5), .table-uppercase td:nth-child(5) { width: 13%; } /* nº/Ticket */
+.table-uppercase th:nth-child(6), .table-uppercase td:nth-child(6) { width: 30%; } /* Descrição */
+.table-uppercase th:nth-child(7), .table-uppercase td:nth-child(7) { width: 10%; }  /* Status */
+.table-uppercase th:nth-child(8), .table-uppercase td:nth-child(8) { width: 5%; text-align: center; }  /* Detalhes */
 
 .table-uppercase th {
-    background-color: #f8f9fa;
+    background-color: #dee2e6;
     font-weight: 600;
     padding: 12px 8px;
     text-align: left;
+    border-bottom: 3px solid #ced4da;
 }
 
 .table-uppercase td {
     padding: 10px 8px;
-    vertical-align: top;
+    vertical-align: middle;
 }
 
 /* DESCrição com quebra */
-.table-uppercase td:nth-child(5) {
+.table-uppercase td:nth-child(6),
+.table-uppercase td:nth-child(4) {
     word-wrap: break-word;
     word-break: break-word;
     white-space: normal;
@@ -1032,7 +1037,7 @@ tbody tr:hover { background-color: #f1f3f5; }
 }
 
 /* Outras colunas sem quebra */
-.table-uppercase td:not(:nth-child(5)) {
+.table-uppercase td:not(:nth-child(4)):not(:nth-child(6)) {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1063,17 +1068,26 @@ tbody tr:hover { background-color: #f1f3f5; }
     background-color: #0d6efd;
     color: #fff;
 }
+case tbody td {
+    background-color: #ffffff;
+}
+/* Combinação das Opções 2 (Zebra) e 3 (Hover Moderno) */
 
-/* Transições suaves para o encolhimento */
-.sidebar, .content {
-    transition: all 0.3s ease-in-out;
+/* Adiciona uma transição suave para TODAS as linhas */
+.table-uppercase tbody tr {
+    transition: all 0.2s ease-in-out;
 }
 
-/* --- ESTADO RECOLHIDO --- */
-/* A classe .sidebar-collapsed será adicionada ao <body> via JavaScript */
+/* Pinta o fundo das linhas PARES com um cinza sutil (Efeito Zebra) */
+.table-uppercase tbody tr:nth-child(even) {
+    background-color: #F8F8FF;
+}
 
-body.sidebar-collapsed .sidebar {
-    flex-basis: 80px; /* Largura do menu encolhido */
-    padding-left: 15px;
-    padding-right: 15px;
+/* Aplica o efeito de "flutuar" ao passar o mouse em QUALQUER linha */
+.table-uppercase tbody tr:hover {
+    background-color: #ffffff; /* Garante que a linha fique branca ao flutuar */
+    transform: scale(1.01); /* Aumenta um pouco o tamanho */
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1); /* Adiciona a sombra */
+    position: relative; /* Necessário para o z-index funcionar */
+    z-index: 10; /* Garante que a linha flutue por cima das outras */
 }

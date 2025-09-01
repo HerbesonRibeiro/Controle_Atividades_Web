@@ -6,24 +6,9 @@ from utils.db import Database
 import bcrypt
 from datetime import date
 import math
+from app.decorators import admin_required, login_required, gestor_required
 
 db = Database()
-
-
-# --- DECORATOR PARA ADMIN REQUIRED ---
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Verifica se o usuário está logado E se o perfil é 'Administrator'
-        if session.get('colaborador_perfil') != 'Administrador':
-            flash('Acesso negado. Você não tem permissão para acessar esta página.', 'danger')
-            return redirect(url_for('index'))  # Redireciona para a home se não for admin
-        return f(*args, **kwargs)
-
-    return decorated_function
-
-
-# --- FIM DO DECORATOR ---
 
 @app.route('/')
 def index():
@@ -33,28 +18,20 @@ def index():
     # Simplesmente renderiza a nova página de boas-vindas
     return render_template('home.html')
 
-
-# ROTA DO HISTÓRICO AGORA EM (/historico)
 @app.route('/historico')
+@login_required
 def historico():
-    if 'colaborador_id' not in session:
-        return redirect(url_for('login'))
-
     # --- LÓGICA DE PAGINAÇÃO ---
     page = request.args.get('page', 1, type=int)
     PER_PAGE = 25
     offset = (page - 1) * PER_PAGE
 
-    # --- Busca de dados para os filtros ---
+    # --- Busca de dados para os menus de filtro ---
     tipos_atendimento = db.execute_query("SELECT nome FROM tipos_atendimento ORDER BY nome", fetch='all') or []
     lista_colaboradores = db.execute_query("SELECT id, nome FROM colaboradores ORDER BY nome", fetch='all') or []
     lista_setores = db.execute_query("SELECT id, nome_setor FROM setores ORDER BY nome_setor", fetch='all') or []
 
-    # --- Lógica de Permissões e Filtros ---
-    user_id = session['colaborador_id']
-    query_perfil = "SELECT p.nome AS perfil_nome FROM colaboradores c JOIN perfis p ON c.perfil_id = p.id WHERE c.id = %s"
-    user_profile = db.execute_query(query_perfil, (user_id,), fetch='one')['perfil_nome']
-
+    # --- Construção da Query Dinâmica ---
     base_query_from = """
         FROM atividades a
         JOIN tipos_atendimento t ON a.tipo_atendimento_id = t.id 
@@ -64,62 +41,57 @@ def historico():
     where_clauses = []
     params = []
 
+    # Aplica filtro de permissão com base no perfil do usuário logado
+    user_id = session['colaborador_id']
+    user_profile = session['colaborador_perfil']
+
     if user_profile == 'Colaborador':
         where_clauses.append("a.colaborador_id = %s")
         params.append(user_id)
     elif user_profile == 'Gestor':
-        where_clauses.append("s.gestor_id = %s")
-        params.append(user_id)
+        # LÓGICA CORRIGIDA: Encontra os setores do gestor e filtra por eles
+        query_setores_gestor = "SELECT id FROM setores WHERE gestor_id = %s"
+        setores_do_gestor = db.execute_query(query_setores_gestor, (user_id,), fetch='all')
+        if setores_do_gestor:
+            ids_setores = [s['id'] for s in setores_do_gestor]
+            placeholders = ','.join(['%s'] * len(ids_setores))
+            where_clauses.append(f"c.setor_id IN ({placeholders})")
+            params.extend(ids_setores)
+        else:
+            # Se um gestor não gerencia nenhum setor, ele não vê nenhuma atividade
+            where_clauses.append("1=0")
 
-    # --- CONSTRUÇÃO DOS FILTROS ---
-    # Pega todos os filtros da URL que não estão vazios
     filtros_aplicados = {k: v for k, v in request.args.items() if k != 'page' and v}
 
-    # Filtro por Tipo de Atendimento
-    if 'tipo_filtro' in filtros_aplicados:
+    if filtros_aplicados.get('tipo_filtro'):
         where_clauses.append("t.nome = %s")
         params.append(filtros_aplicados['tipo_filtro'])
-
-    # Filtro por Data de Início
-    if 'data_ini' in filtros_aplicados:
-        where_clauses.append("a.data_atendimento >= %s")
+    if filtros_aplicados.get('data_ini'):
+        where_clauses.append("DATE(a.data_atendimento) >= %s")
         params.append(filtros_aplicados['data_ini'])
-
-    # Filtro por Data de Fim
-    if 'data_fim' in filtros_aplicados:
-        # Adicionamos ' 23:59:59' para incluir o dia inteiro
-        where_clauses.append("a.data_atendimento <= %s")
-        params.append(f"{filtros_aplicados['data_fim']} 23:59:59")
-
-    # Filtro por Colaborador
-    if 'colaborador_filtro' in filtros_aplicados:
-        where_clauses.append("a.colaborador_id = %s")
+    if filtros_aplicados.get('data_fim'):
+        where_clauses.append("DATE(a.data_atendimento) <= %s")
+        params.append(filtros_aplicados['data_fim'])
+    if filtros_aplicados.get('colaborador_filtro'):
+        where_clauses.append("c.id = %s")  # Filtra pelo ID do colaborador
         params.append(filtros_aplicados['colaborador_filtro'])
-
-    # Filtro por Setor
-    if 'setor_filtro' in filtros_aplicados:
-        where_clauses.append("c.setor_id = %s")
+    if filtros_aplicados.get('setor_filtro'):
+        where_clauses.append("s.id = %s")  # Filtra pelo ID do setor
         params.append(filtros_aplicados['setor_filtro'])
-
-    # Filtro por Descrição
-    if 'descricao_filtro' in filtros_aplicados:
+    if filtros_aplicados.get('descricao_filtro'):
         where_clauses.append("a.descricao LIKE %s")
         params.append(f"%{filtros_aplicados['descricao_filtro']}%")
 
-    where_sql = ""
-    if where_clauses:
-        where_sql = " WHERE " + " AND ".join(where_clauses)
+    where_sql = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
-    # --- Query para CONTAR o total de registros ---
-    count_query = "SELECT COUNT(a.id) AS count" + base_query_from + where_sql
-    total_records = db.execute_query(count_query, tuple(params), fetch='one')['count']
-    total_pages = math.ceil(total_records / PER_PAGE)
+    # Query para CONTAR o total de registros (forma mais segura)
+    count_query = "SELECT COUNT(a.id) AS total" + base_query_from + where_sql
+    count_result = db.execute_query(count_query, tuple(params), fetch='one')
+    total_records = count_result['total'] if count_result else 0
+    total_pages = math.ceil(total_records / PER_PAGE) if total_records > 0 else 1
 
-    # --- Query para BUSCAR os dados da página atual ---
-    data_query = "SELECT a.id, a.data_atendimento, a.status, t.nome AS tipo_atendimento, a.numero_atendimento, a.descricao, c.nome AS colaborador_nome, s.nome_setor, a.nivel_complexidade"
-    data_query += base_query_from + where_sql
-    data_query += " ORDER BY a.data_atendimento DESC, a.id DESC LIMIT %s OFFSET %s"
-
+    # Query para BUSCAR os dados da página
+    data_query = "SELECT a.id, a.data_atendimento, a.status, t.nome AS tipo_atendimento, a.numero_atendimento, a.descricao, c.nome AS colaborador_nome, s.nome_setor, a.nivel_complexidade" + base_query_from + where_sql + " ORDER BY a.data_atendimento DESC, a.id DESC LIMIT %s OFFSET %s"
     atividades = db.execute_query(data_query, tuple(params + [PER_PAGE, offset]), fetch='all') or []
 
     return render_template('historico.html',
@@ -130,7 +102,6 @@ def historico():
                            filtros_aplicados=filtros_aplicados,
                            current_page=page,
                            total_pages=total_pages)
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
