@@ -105,8 +105,9 @@
                             <td class="actions-cell">
                                 <button type="button" class="btn-action btn-details"
                                         data-id="{{ atividade.id }}"
-                                        data-data="{{ atividade.data_atendimento.strftime('%d/%m/%Y %H:%M') if atividade.data_atendimento }}"
+                                        data-data="{{ atividade.data_atendimento.strftime('%d/%m/%Y') if atividade.data_atendimento }}"
                                         data-tipo="{{ atividade.tipo_atendimento }}"
+                                        data-numero="{{ atividade.numero_atendimento }}"
                                         data-colaborador="{{ atividade.colaborador_nome }}"
                                         data-status="{{ atividade.status }}"
                                         data-descricao="{{ atividade.descricao }}">

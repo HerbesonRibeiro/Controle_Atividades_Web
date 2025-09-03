@@ -115,6 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <p><strong>ID:</strong> ${data.id}</p>
                         <p><strong>Data:</strong> ${data.data}</p>
                         <p><strong>Tipo:</strong> ${data.tipo}</p>
+                        <p><strong>Nº Atendimento:</strong> ${data.numero}</p>
                         <p><strong>Colaborador:</strong> ${data.colaborador}</p>
                         <p><strong>Status:</strong> ${data.status}</p>
                         <hr>
