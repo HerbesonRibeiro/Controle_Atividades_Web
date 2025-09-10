@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <h1><i class="fas fa-chart-line icon-title"></i> Dashboard</h1>
+
+    {# --- INÍCIO DA LÓGICA DE EXIBIÇÃO POR PERFIL --- #}
+
+    {# --- 1. VISÃO DO ADMINISTRADOR --- #}
+    {% if session.colaborador_perfil == 'Administrador' %}
+
+        <div class="dashboard-grid">
+            <div class="kpi-card">
+                <h3>Total de Atividades</h3>
+                <p class="kpi-number">{{ kpis.get('total_atividades', 0) }}</p>
+                <i class="fas fa-tasks kpi-icon"></i>
+            </div>
+            <div class="kpi-card">
+                <h3>Atividades Hoje</h3>
+                <p class="kpi-number">{{ kpis.get('atividades_hoje', 0) }}</p>
+                <i class="fas fa-calendar-day kpi-icon"></i>
+            </div>
+            <div class="kpi-card">
+                <h3>Colaboradores Ativos</h3>
+                <p class="kpi-number">{{ kpis.get('total_colaboradores', 0) }}</p>
+                <i class="fas fa-user-check kpi-icon"></i>
+            </div>
+            <div class="kpi-card">
+                <h3>Setor com Mais Atividades</h3>
+                <p class="kpi-highlight">{{ dados_extras.setor_mais_ativo.nome_setor if dados_extras.setor_mais_ativo else 'N/A' }}</p>
+                <span class="kpi-subtext">{{ dados_extras.setor_mais_ativo.total_atividades if dados_extras.setor_mais_ativo else 0 }} atividades</span>
+                <i class="fas fa-building kpi-icon"></i>
+            </div>
+            <div class="kpi-card">
+                <h3>Colaborador com Mais Atividades</h3>
+                <p class="kpi-highlight">{{ dados_extras.colaborador_mais_ativo.nome if dados_extras.colaborador_mais_ativo else 'N/A' }}</p>
+                <span class="kpi-subtext">{{ dados_extras.colaborador_mais_ativo.total_atividades if dados_extras.colaborador_mais_ativo else 0 }} atividades</span>
+                <i class="fas fa-user-graduate kpi-icon"></i>
+            </div>
+        </div>
+
+        <div class="dashboard-row">
+            <div class="info-card list-card">
+                <h2>Colaboradores Ativos por Setor</h2>
+                <ul>
+                    {% for item in dados_extras.get('colaboradores_por_setor', []) %}
+                    <li><span>{{ item.nome_setor }}</span><span class="list-count">{{ item.total_colaboradores }}</span></li>
+                    {% else %}
+                    <li>Nenhum dado encontrado.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="info-card list-card">
+                <h2>Top 3 Atividades Mais Utilizadas</h2>
+                <ul>
+                    {% for atividade in dados_extras.get('top_atividades', []) %}
+                    <li><span>{{ atividade.nome }}</span><span class="list-count">{{ atividade.total }}</span></li>
+                    {% else %}
+                    <li>Nenhuma atividade registrada.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+    {# --- 2. VISÃO DO GESTOR --- #}
+    {% elif session.colaborador_perfil == 'Gestor' %}
+
+        <div class="dashboard-grid">
+            <div class="kpi-card">
+                <h3>Atividades do Setor</h3>
+                <p class="kpi-number">{{ kpis.get('total_atividades_setor', 0) }}</p>
+                <i class="fas fa-tasks kpi-icon"></i>
+            </div>
+            <div class="kpi-card">
+                <h3>Atividades Hoje (Setor)</h3>
+                <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
+                <i class="fas fa-calendar-day kpi-icon"></i>
+            </div>
+            <div class="kpi-card">
+                <h3>Colaboradores no Setor</h3>
+                <p class="kpi-number">{{ kpis.get('total_colaboradores_setor', 0) }}</p>
+                <i class="fas fa-users kpi-icon"></i>
+            </div>
+            <div class="kpi-card">
+                <h3>Colaborador Destaque (Setor)</h3>
+                <p class="kpi-highlight">{{ dados_extras.colaborador_top_setor.nome if dados_extras.colaborador_top_setor else 'N/A' }}</p>
+                <span class="kpi-subtext">{{ dados_extras.colaborador_top_setor.total_atividades if dados_extras.colaborador_top_setor else 0 }} atividades</span>
+                <i class="fas fa-user-graduate kpi-icon"></i>
+            </div>
+        </div>
+
+        <div class="dashboard-row">
+            <div class="info-card list-card">
+                <h2>Top 3 Atividades do Setor</h2>
+                <ul>
+                    {% for atividade in dados_extras.get('top_atividades_setor', []) %}
+                    <li><span>{{ atividade.nome }}</span><span class="list-count">{{ atividade.total }}</span></li>
+                    {% else %}
+                    <li>Nenhuma atividade no setor.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="info-card list-card">
+                <h2>Top 3 Colaboradores do Setor</h2>
+                <ul>
+                    {% for colab in dados_extras.get('top_colaboradores_setor', []) %}
+                    <li><span>{{ colab.nome }}</span><span class="list-count">{{ colab.total_atividades }}</span></li>
+                    {% else %}
+                    <li>Nenhum colaborador no setor.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+    {# --- 3. VISÃO DO COLABORADOR --- #}
+    {% else %}
+
+        <div class="dashboard-grid">
+            <div class="kpi-card">
+                <h3>Minhas Atividades Totais</h3>
+                <p class="kpi-number">{{ kpis.get('total_atividades', 0) }}</p>
+                <i class="fas fa-tasks kpi-icon"></i>
+            </div>
+            <div class="kpi-card">
+                <h3>Minhas Atividades Hoje</h3>
+                <p class="kpi-number">{{ kpis.get('atividades_hoje', 0) }}</p>
+                <i class="fas fa-calendar-day kpi-icon"></i>
+            </div>
+        </div>
+        <div class="info-card" style="margin-top: 20px;">
+            <p>Este é um resumo das suas atividades pessoais. Para mais detalhes, acesse o <a href="{{ url_for('historico') }}">Histórico de Atividades</a>.</p>
+        </div>
+
+    {% endif %}
+    {# --- FIM DA LÓGICA DE EXIBIÇÃO POR PERFIL --- #}
+
+
+    <div class="info-card" style="margin-top: 20px;">
+        <h2>Atividades nos Últimos 7 Dias</h2>
+        <div class="chart-container">
+            <canvas id="atividadesChart"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('atividadesChart').getContext('2d');
+            const labels = {{ labels_grafico | tojson }};
+            const datasets = {{ datasets_grafico | tojson }};
+
+            // Lógica para determinar o título do gráfico
+            let chartTitleText = 'Atividades Diárias';
+            const userProfile = "{{ session.colaborador_perfil }}";
+            if (userProfile === 'Administrador') {
+                chartTitleText = 'Atividades Diárias por Setor';
+            } else if (userProfile === 'Gestor') {
+                chartTitleText = 'Atividades Diárias por Colaborador do Setor';
+            }
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    plugins: {
+                        title: { display: true, text: chartTitleText },
+                        legend: { position: 'top' },
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, title: { display: true, text: 'Data' }},
+                        y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Quantidade de Atividades' }}
+                    }
+                }
+            });
+        });
+    </script>
+{% endblock %}

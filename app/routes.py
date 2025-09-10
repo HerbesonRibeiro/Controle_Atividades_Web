@@ -4,7 +4,7 @@ from flask import session, flash, redirect, url_for, render_template, request
 from app import app
 from utils.db import Database
 import bcrypt
-from datetime import date
+from datetime import date,datetime,timedelta
 import math
 from app.decorators import admin_required, login_required, gestor_required
 
@@ -701,3 +701,150 @@ def editar_setor(id):
     colaboradores = db.execute_query(query_colaboradores, fetch='all') or []
 
     return render_template('editar_setor.html', setor=setor, colaboradores=colaboradores)
+
+
+# Em app/routes.py
+
+# Dicionário de cache, mantenha-o no topo do arquivo, fora de qualquer função
+dashboard_cache = {
+    'Administrador': {'data': None, 'last_updated': None},
+    'Gestor': {}  # Cache por gestor
+}
+CACHE_DURATION_MINUTES = 10
+
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    perfil = session.get('colaborador_perfil')
+    user_id = session.get('colaborador_id')
+
+    # --- 1. CLÁUSULA DE GUARDA (Segurança) ---
+    # Se for um colaborador, barra a entrada e redireciona.
+    if perfil == 'Colaborador':
+        flash('Você não tem permissão para acessar o dashboard.', 'warning')
+        return redirect(url_for('index'))
+
+    # --- 2. VERIFICAÇÃO DE CACHE (Performance) ---
+    now = datetime.now()
+    cache_key = str(user_id) if perfil == 'Gestor' else perfil
+
+    cache_data_source = dashboard_cache['Gestor'] if perfil == 'Gestor' else dashboard_cache
+    cache_entry = cache_data_source.get(cache_key)
+
+    if cache_entry and cache_entry.get('data') and (
+            now < cache_entry.get('last_updated') + timedelta(minutes=CACHE_DURATION_MINUTES)):
+        print(f"INFO: Servindo dashboard para {perfil} {user_id} via CACHE.")
+        return render_template('dashboard.html', **cache_entry['data'])
+
+    # --- 3. LÓGICA PRINCIPAL (Busca de dados no banco) ---
+    print(f"INFO: Gerando dashboard para {perfil} {user_id} a partir do BANCO DE DADOS.")
+    kpis = {}
+    dados_extras = {}
+    labels_grafico = []
+    datasets_grafico = []
+
+    # --- LÓGICA SE ADMINISTRADOR ---
+    if perfil == 'Administrador':
+        # KPIs
+        kpis['total_atividades'] = db.execute_query("SELECT COUNT(id) AS total FROM atividades", fetch='one')['total']
+        kpis['atividades_hoje'] = \
+        db.execute_query("SELECT COUNT(id) AS total FROM atividades WHERE DATE(data_atendimento) = CURDATE()",
+                         fetch='one')['total']
+        kpis['total_colaboradores'] = \
+        db.execute_query("SELECT COUNT(id) AS total FROM colaboradores WHERE status = 'Ativo'", fetch='one')['total']
+
+        # Cards Extras
+        query_setor_top = "SELECT s.nome_setor, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN setores s ON c.setor_id = s.id GROUP BY s.nome_setor ORDER BY total_atividades DESC LIMIT 1;"
+        dados_extras['setor_mais_ativo'] = db.execute_query(query_setor_top, fetch='one')
+        query_colab_top = "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1;"
+        dados_extras['colaborador_mais_ativo'] = db.execute_query(query_colab_top, fetch='one')
+
+        # Listas
+        query_colab_setor = "SELECT s.nome_setor, COUNT(c.id) AS total_colaboradores FROM colaboradores c JOIN setores s ON c.setor_id = s.id WHERE c.status = 'Ativo' GROUP BY s.nome_setor ORDER BY total_colaboradores DESC;"
+        dados_extras['colaboradores_por_setor'] = db.execute_query(query_colab_setor, fetch='all')
+        query_top_atividades = "SELECT ta.nome, COUNT(a.id) AS total FROM atividades a JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3;"
+        dados_extras['top_atividades'] = db.execute_query(query_top_atividades, fetch='all')
+
+        # Dados para o Gráfico (Empilhado por Setor)
+        query_grafico = "SELECT DATE(a.data_atendimento) as dia, s.nome_setor, COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN setores s ON c.setor_id = s.id WHERE a.data_atendimento >= CURDATE() - INTERVAL 6 DAY GROUP BY dia, s.nome_setor ORDER BY dia ASC, s.nome_setor ASC;"
+        dados_brutos_grafico = db.execute_query(query_grafico, fetch='all')
+
+        if dados_brutos_grafico:
+            labels_grafico = sorted(list(set([d['dia'].strftime('%d/%m') for d in dados_brutos_grafico])))
+            setores = sorted(list(set([d['nome_setor'] for d in dados_brutos_grafico])))
+            dados_por_setor = {setor: [0] * len(labels_grafico) for setor in setores}
+            for dado in dados_brutos_grafico:
+                label_index = labels_grafico.index(dado['dia'].strftime('%d/%m'))
+                dados_por_setor[dado['nome_setor']][label_index] = dado['total']
+
+            cores = ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)',
+                     'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)']
+            for i, setor in enumerate(setores):
+                datasets_grafico.append(
+                    {'label': setor, 'data': dados_por_setor[setor], 'backgroundColor': cores[i % len(cores)]})
+
+    # --- LÓGICA DO GESTOR ---
+    elif perfil == 'Gestor':
+        query_setor = "SELECT id FROM setores WHERE gestor_id = %s"
+        setor_gestor = db.execute_query(query_setor, (user_id,), fetch='one')
+
+        if setor_gestor:
+            setor_id = setor_gestor['id']
+            params = [setor_id]
+            # KPIs
+            kpis['total_atividades_setor'] = db.execute_query(
+                "SELECT COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s",
+                tuple(params), fetch='one')['total']
+            kpis['atividades_hoje_setor'] = db.execute_query(
+                "SELECT COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND DATE(a.data_atendimento) = CURDATE()",
+                tuple(params), fetch='one')['total']
+            kpis['total_colaboradores_setor'] = \
+            db.execute_query("SELECT COUNT(id) AS total FROM colaboradores WHERE setor_id = %s AND status = 'Ativo'",
+                             tuple(params), fetch='one')['total']
+            dados_extras['colaborador_top_setor'] = db.execute_query(
+                "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1",
+                tuple(params), fetch='one')
+            # Listas
+            dados_extras['top_atividades_setor'] = db.execute_query(
+                "SELECT ta.nome, COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id WHERE c.setor_id = %s GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3",
+                tuple(params), fetch='all')
+            dados_extras['top_colaboradores_setor'] = db.execute_query(
+                "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 3",
+                tuple(params), fetch='all')
+            # Gráfico do Gestor (Empilhado por Colaborador)
+            query_grafico = "SELECT DATE(a.data_atendimento) as dia, c.nome as colaborador, COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND a.data_atendimento >= CURDATE() - INTERVAL 6 DAY GROUP BY dia, colaborador ORDER BY dia ASC, colaborador ASC;"
+            dados_brutos_grafico = db.execute_query(query_grafico, tuple(params), fetch='all')
+            if dados_brutos_grafico:
+                labels_grafico = sorted(list(set([d['dia'].strftime('%d/%m') for d in dados_brutos_grafico])))
+                colaboradores = sorted(list(set([d['colaborador'] for d in dados_brutos_grafico])))
+                dados_por_colaborador = {colab: [0] * len(labels_grafico) for colab in colaboradores}
+                for dado in dados_brutos_grafico:
+                    label_index = labels_grafico.index(dado['dia'].strftime('%d/%m'))
+                    dados_por_colaborador[dado['colaborador']][label_index] = dado['total']
+                cores = ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)',
+                         'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)']
+                for i, colaborador in enumerate(colaboradores):
+                    datasets_grafico.append({'label': colaborador, 'data': dados_por_colaborador[colaborador],
+                                             'backgroundColor': cores[i % len(cores)]})
+
+    # --- LÓGICA DO COLABORADOR --- AINDA NÃO PRODUZIDO
+
+    template_data = {
+        'kpis': kpis,
+        'dados_extras': dados_extras,
+        'labels_grafico': labels_grafico,
+        'datasets_grafico': datasets_grafico
+    }
+
+    if perfil == 'Administrador':
+        dashboard_cache['Administrador'] = {'data': template_data, 'last_updated': now}
+    elif perfil == 'Gestor':
+        dashboard_cache['Gestor'][cache_key] = {'data': template_data, 'last_updated': now}
+
+    # --- SAÍDA ÚNICA E UNIFICADA ---
+    return render_template('dashboard.html',
+                           kpis=kpis,
+                           dados_extras=dados_extras,
+                           labels_grafico=labels_grafico,
+                           datasets_grafico=datasets_grafico)

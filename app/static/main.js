@@ -1,30 +1,49 @@
 document.addEventListener('DOMContentLoaded', function() {
 
-    // --- LÓGICA GERAL E NOTIFICAÇÕES (TOAST) ---
-    // Esta parte roda em todas as páginas
+    // --- 1. LÓGICA GERAL E NOTIFICAÇÕES (TOAST) ---
     const toasts = document.querySelectorAll('#toast-container .toast');
     toasts.forEach((toast) => {
         setTimeout(() => {
             toast.classList.add('fade-out');
             toast.addEventListener('animationend', () => toast.remove());
-        }, 5000); // Desaparece após 5 segundos
+        }, 5000);
     });
 
 
-    // --- LÓGICA DA SIDEBAR (SANFONA) ---
-    // Esta parte também roda em todas as páginas com sidebar
+    // --- 2. LÓGICA DO MENU LATERAL (SEU PADRÃO) ---
+    const allSubmenus = document.querySelectorAll('.sidebar-submenu');
     const menuTitles = document.querySelectorAll('.sidebar-title');
+
+    // Lógica para auto-esconder os submenus inativos ao carregar a página
+    allSubmenus.forEach(submenu => {
+        // Verifica se algum link dentro do submenu está ativo
+        const hasActiveLink = submenu.querySelector('a.active') !== null;
+
+        // Se nenhum link estiver ativo, esconde o submenu
+        if (!hasActiveLink) {
+            submenu.classList.add('hidden'); // Usando a classe 'hidden' do seu CSS
+        }
+    });
+
+    // Adiciona o evento de clique para abrir/fechar
     menuTitles.forEach(title => {
         title.addEventListener('click', function(event) {
             event.preventDefault();
-            const submenu = this.nextElementSibling;
-            if (submenu && submenu.classList.contains('sidebar-submenu')) {
-                submenu.classList.toggle('hidden');
+            const submenuToToggle = this.nextElementSibling;
+
+            // Fecha todos os outros submenus
+            allSubmenus.forEach(otherSubmenu => {
+                if (otherSubmenu !== submenuToToggle) {
+                    otherSubmenu.classList.add('hidden');
+                }
+            });
+
+            // Abre ou fecha o submenu clicado
+            if (submenuToToggle && submenuToToggle.classList.contains('sidebar-submenu')) {
+                submenuToToggle.classList.toggle('hidden');
             }
         });
     });
-
-
     // --- LÓGICA ESPECÍFICA DA PÁGINA DE HISTÓRICO ---
     // O código abaixo só será executado se os elementos da página de histórico existirem,
     // evitando erros em outras páginas.

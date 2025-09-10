@@ -1091,3 +1091,112 @@ case tbody td {
     position: relative; /* Necessário para o z-index funcionar */
     z-index: 10; /* Garante que a linha flutue por cima das outras */
 }
+
+/* --- Estilos do Dashboard --- */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.kpi-card {
+    background-color: #ffffff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.kpi-card h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.kpi-number {
+    margin: 10px 0 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #212529;
+}
+
+.kpi-icon {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+    font-size: 3rem;
+    color: #0d6efd;
+    opacity: 0.15;
+}
+
+/* --- Estilos para os novos cards do Dashboard --- */
+.kpi-highlight {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #0d6efd;
+    margin: 10px 0 5px 0;
+}
+
+.kpi-subtext {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.list-card ul {
+    list-style: none;
+    padding: 0;
+    margin-top: 15px;
+}
+
+.list-card li {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.list-card li:last-child {
+    border-bottom: none;
+}
+
+.list-card .list-count {
+    font-weight: 600;
+    background-color: #e9ecef;
+    padding: 2px 8px;
+    border-radius: 5px;
+}
+
+/* --- Estilo para o Container do Gráfico --- */
+.chart-container {
+    position: relative;
+    height: 400px; /* Você pode ajustar este valor se quiser mais alto ou mais baixo */
+    width: 100%;
+}
+
+/* --- Estilo para o Layout em Linha do Dashboard --- */
+.dashboard-row {
+    display: flex;
+    flex-wrap: wrap; /* Permite que os itens quebrem para a linha de baixo se não houver espaço */
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* Faz com que cada card na linha tente ocupar o mesmo espaço */
+.dashboard-row > .info-card {
+    flex: 1;
+    min-width: 300px; /* Largura mínima antes de quebrar a linha */
+}
+
+/* Ajuste para o espaçamento interno não ser afetado */
+.dashboard-row > .info-card {
+    margin-top: 0 !important;
+}

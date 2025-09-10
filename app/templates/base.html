@@ -29,6 +29,15 @@
     <div class="main-layout">
         <nav class="sidebar">
             <ul class="sidebar-menu">
+                {% if session.colaborador_perfil != 'Colaborador' %}
+                <li>
+                    <a href="#" class="sidebar-title">INDICADORES</a>
+                    <ul class="sidebar-submenu">
+                        <li><a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">Dashboard</a></li>
+                    </ul>
+                </li>
+                {% endif %}
+
                 <li>
                     <a href="#" class="sidebar-title" id="atividades-menu-toggle">ATIVIDADES</a>
                     <ul class="sidebar-submenu {{ '' if request.endpoint in ['index', 'historico', 'registrar_atividade'] else 'hidden' }}">
