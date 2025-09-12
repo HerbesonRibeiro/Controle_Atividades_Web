@@ -13,42 +13,50 @@
 </head>
 <body>
     <header class="main-header">
-        <div class="header-title">
-            <a href="{{ url_for('index') }}">
-                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="header-logo">
-            </a>
+        <div class="header-left">
+            <button id="sidebar-toggle-btn" class="sidebar-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
-        <nav>
-             {% if session['colaborador_id'] %}
-                <span>Olá, {{ session['colaborador_nome'] }}</span>
-                <a href="{{ url_for('logout') }}">Sair</a>
+        <nav class="header-right">
+            {% if session['colaborador_id'] %}
+                <span class="user-info">Olá, {{ session['colaborador_nome'] }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
             {% endif %}
         </nav>
     </header>
 
     <div class="main-layout">
+
         <nav class="sidebar">
+            <div class="sidebar-header">
+                <a href="{{ url_for('index') }}">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="sidebar-logo">
+                </a>
+            </div>
+
             <ul class="sidebar-menu">
+
                 {% if session.colaborador_perfil != 'Colaborador' %}
                 <li>
                     <a href="#" class="sidebar-title">INDICADORES</a>
-                    <ul class="sidebar-submenu">
+                    <ul class="sidebar-submenu {{ 'hidden' if request.endpoint != 'dashboard' else '' }}">
                         <li><a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">Dashboard</a></li>
                     </ul>
                 </li>
                 {% endif %}
 
                 <li>
-                    <a href="#" class="sidebar-title" id="atividades-menu-toggle">ATIVIDADES</a>
-                    <ul class="sidebar-submenu {{ '' if request.endpoint in ['index', 'historico', 'registrar_atividade'] else 'hidden' }}">
+                    <a href="#" class="sidebar-title">ATIVIDADES</a>
+                    <ul class="sidebar-submenu {{ 'hidden' if request.endpoint not in ['registrar_atividade', 'historico'] else '' }}">
                         <li><a href="{{ url_for('registrar_atividade') }}" class="{{ 'active' if request.endpoint == 'registrar_atividade' else '' }}">Registrar Atividade</a></li>
-                        <li><a href="{{ url_for('historico') }}" class="{{ 'active' if request.endpoint == 'historico' else '' }}">Histórico de Atividades</a></li>
+                        <li><a href="{{ url_for('historico') }}" class="{{ 'active' if request.endpoint == 'historico' else '' }}">Histórico</a></li>
                     </ul>
                 </li>
 
                 <li>
                     <a href="#" class="sidebar-title">PERFIL</a>
-                    <ul class="sidebar-submenu">
+                    <ul class="sidebar-submenu {{ 'hidden' if request.endpoint != 'perfil' else '' }}">
                         <li><a href="{{ url_for('perfil') }}" class="{{ 'active' if request.endpoint == 'perfil' else '' }}">Meu Perfil</a></li>
                     </ul>
                 </li>
@@ -56,10 +64,10 @@
                 {% if session.get('colaborador_perfil') == 'Administrador' %}
                 <li>
                     <a href="#" class="sidebar-title">GESTÃO</a>
-                    <ul class="sidebar-submenu">
-                        <li><a href="{{ url_for('gestao_usuarios') }}" class="{{ 'active' if request.endpoint == 'gestao_usuarios' else '' }}">Gestão de Usuários</a></li>
-                        <li><a href="{{ url_for('gestao_tipos_atividades') }}" class="{{ 'active' if request.endpoint == 'gestao_atividades' else '' }}">Gestão de Atividades</a></li>
-                        <li><a href="{{ url_for('gestao_setores') }}" class="{{ 'active' if request.endpoint in ['gestao_setores', 'editar_setor'] else '' }}">Gestão de Setores</a></li>
+                    <ul class="sidebar-submenu {{ 'hidden' if request.endpoint not in ['gestao_usuarios', 'gestao_tipos_atividades', 'gestao_setores', 'editar_setor'] else '' }}">
+                        <li><a href="{{ url_for('gestao_usuarios') }}" class="{{ 'active' if request.endpoint == 'gestao_usuarios' else '' }}">Usuários</a></li>
+                        <li><a href="{{ url_for('gestao_tipos_atividades') }}" class="{{ 'active' if request.endpoint == 'gestao_tipos_atividades' else '' }}">Tipos de Atividade</a></li>
+                        <li><a href="{{ url_for('gestao_setores') }}" class="{{ 'active' if request.endpoint in ['gestao_setores', 'editar_setor'] else '' }}">Setores</a></li>
                     </ul>
                 </li>
                 {% endif %}
@@ -70,6 +78,7 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+
     <div id="toast-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}

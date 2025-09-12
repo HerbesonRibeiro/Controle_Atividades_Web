@@ -1,51 +1,52 @@
 document.addEventListener('DOMContentLoaded', function() {
 
-    // --- 1. LÓGICA GERAL E NOTIFICAÇÕES (TOAST) ---
+    // --- 1. LÓGICA DAS NOTIFICAÇÕES (TOAST) ---
     const toasts = document.querySelectorAll('#toast-container .toast');
     toasts.forEach((toast) => {
+        // Define um tempo para a notificação desaparecer
         setTimeout(() => {
             toast.classList.add('fade-out');
+            // Remove o elemento da página após a animação de saída
             toast.addEventListener('animationend', () => toast.remove());
-        }, 5000);
+        }, 5000); // 5 segundos
     });
 
+    // --- 2. LÓGICA DA SIDEBAR (BOTÃO HAMBURGER) ---
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+    const body = document.body;
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            body.classList.toggle('sidebar-collapsed');
+        });
+    }
 
-    // --- 2. LÓGICA DO MENU LATERAL (SEU PADRÃO) ---
-    const allSubmenus = document.querySelectorAll('.sidebar-submenu');
+    // --- 3. LÓGICA DOS SUBMENUS (ABRIR/FECHAR AO CLICAR) ---
     const menuTitles = document.querySelectorAll('.sidebar-title');
-
-    // Lógica para auto-esconder os submenus inativos ao carregar a página
-    allSubmenus.forEach(submenu => {
-        // Verifica se algum link dentro do submenu está ativo
-        const hasActiveLink = submenu.querySelector('a.active') !== null;
-
-        // Se nenhum link estiver ativo, esconde o submenu
-        if (!hasActiveLink) {
-            submenu.classList.add('hidden'); // Usando a classe 'hidden' do seu CSS
-        }
-    });
-
-    // Adiciona o evento de clique para abrir/fechar
     menuTitles.forEach(title => {
         title.addEventListener('click', function(event) {
-            event.preventDefault();
-            const submenuToToggle = this.nextElementSibling;
+            event.preventDefault(); // Impede que a página pule para o topo
 
-            // Fecha todos os outros submenus
-            allSubmenus.forEach(otherSubmenu => {
-                if (otherSubmenu !== submenuToToggle) {
+            const submenu = this.nextElementSibling;
+
+            // Segurança: verifica se o submenu realmente existe
+            if (!submenu || !submenu.classList.contains('sidebar-submenu')) {
+                return;
+            }
+
+            // Fecha todos os OUTROS submenus que estiverem abertos
+            document.querySelectorAll('.sidebar-submenu').forEach(otherSubmenu => {
+                if (otherSubmenu !== submenu) {
                     otherSubmenu.classList.add('hidden');
                 }
             });
 
             // Abre ou fecha o submenu clicado
-            if (submenuToToggle && submenuToToggle.classList.contains('sidebar-submenu')) {
-                submenuToToggle.classList.toggle('hidden');
-            }
+            submenu.classList.toggle('hidden');
         });
     });
-    // --- LÓGICA ESPECÍFICA DA PÁGINA DE HISTÓRICO ---
-    // O código abaixo só será executado se os elementos da página de histórico existirem,
+
+    // --- 4. LÓGICA ESPECÍFICA DA PÁGINA DE HISTÓRICO ---
+    // O código abaixo só será executado se encontrar o formulário do histórico,
     // evitando erros em outras páginas.
     const bulkForm = document.getElementById('bulk-action-form');
     if (bulkForm) {
@@ -64,13 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedCount = document.querySelectorAll('.row-checkbox:checked').length;
 
             if (counterElement) {
-                if (selectedCount === 0) {
-                    counterElement.textContent = 'Nenhum item selecionado';
-                } else if (selectedCount === 1) {
-                    counterElement.textContent = '1 item selecionado';
-                } else {
-                    counterElement.textContent = `${selectedCount} itens selecionados`;
-                }
+                counterElement.textContent = selectedCount === 1 ? '1 item selecionado' : `${selectedCount} itens selecionados`;
             }
             if (editBtn) editBtn.disabled = selectedCount !== 1;
             if (deleteBtn) deleteBtn.disabled = selectedCount === 0;
@@ -79,9 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Evento para o checkbox "Selecionar Todos"
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', function() {
-                rowCheckboxes.forEach(checkbox => {
-                    checkbox.checked = this.checked;
-                });
+                rowCheckboxes.forEach(checkbox => checkbox.checked = this.checked);
                 updateCounterAndButtons();
             });
         }
@@ -89,12 +82,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Evento para os checkboxes individuais
         rowCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', function() {
-                if (!this.checked) {
-                    selectAllCheckbox.checked = false;
-                } else {
-                    const allSelected = Array.from(rowCheckboxes).every(cb => cb.checked);
-                    selectAllCheckbox.checked = allSelected;
-                }
+                selectAllCheckbox.checked = Array.from(rowCheckboxes).every(cb => cb.checked);
                 updateCounterAndButtons();
             });
         });
@@ -104,9 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
             editBtn.addEventListener('click', function() {
                 const selectedCheckbox = document.querySelector('.row-checkbox:checked');
                 if (selectedCheckbox) {
-                    const activityId = selectedCheckbox.value;
-                    // CORREÇÃO IMPORTANTE: A URL da sua rota de edição
-                    window.location.href = `/editar_atividade/${activityId}`;
+                    window.location.href = `/editar_atividade/${selectedCheckbox.value}`;
                 }
             });
         }
@@ -114,17 +100,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Confirmação antes de excluir em massa
         bulkForm.addEventListener('submit', function(event) {
             const selectedCount = document.querySelectorAll('.row-checkbox:checked').length;
-            if (selectedCount > 0) {
-                const confirmed = confirm(`Tem certeza que deseja excluir os ${selectedCount} itens selecionados?`);
-                if (!confirmed) {
-                    event.preventDefault(); // Cancela o envio do formulário
-                }
-            } else {
+            if (selectedCount > 0 && !confirm(`Tem certeza que deseja excluir os ${selectedCount} itens selecionados?`)) {
                 event.preventDefault();
             }
         });
 
-        // Lógica do MODAL DE DETALHES (com event delegation mais segura)
+        // Lógica do MODAL DE DETALHES
         if (tableBody) {
              tableBody.addEventListener('click', function(event) {
                 const target = event.target.closest('.btn-details');
@@ -134,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <p><strong>ID:</strong> ${data.id}</p>
                         <p><strong>Data:</strong> ${data.data}</p>
                         <p><strong>Tipo:</strong> ${data.tipo}</p>
-                        <p><strong>Nº Atendimento:</strong> ${data.numero}</p>
+                        <p><strong>Nº Atendimento:</strong> ${data.numero || 'N/A'}</p>
                         <p><strong>Colaborador:</strong> ${data.colaborador}</p>
                         <p><strong>Status:</strong> ${data.status}</p>
                         <hr>

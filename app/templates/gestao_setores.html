@@ -3,42 +3,49 @@
 {% block title %}Gestão de Setores{% endblock %}
 
 {% block content %}
-<div class="gestao-header">
-    <h1><i class="fas fa-building icon-title"></i> Gestão de Setores</h1>
-    <button class="btn-primary" onclick="abrirModal()">
-        <i class="fas fa-plus"></i> Novo Setor
-    </button>
-</div>
+<div class="content-container">
 
-<div class="info-card">
-    <div class="table-container">
-        <table class="gestao-table">
-            <thead>
-                <tr>
-                    <th>Nome do Setor</th>
-                    <th>Gestor Responsável</th>
-                    <th style="width: 15%;">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for setor in setores %}
-                <tr>
-                    <td>{{ setor.nome_setor }}</td>
-                    <td>{{ setor.nome_gestor or 'Nenhum gestor definido' }}</td>
-                    <td style="text-align: center;">
-                        <a href="{{ url_for('editar_setor', id=setor.id) }}" class="btn-action btn-edit" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="3" style="text-align: center; padding: 30px;">Nenhum setor encontrado.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-building"></i> Gestão de Setores</h1>
+        <button class="btn-primary" onclick="abrirModal()">
+            <i class="fas fa-plus"></i> Novo Setor
+        </button>
     </div>
+
+    <div class="info-card">
+        <div class="table-container">
+            <table class="gestao-table">
+                <thead>
+                    <tr>
+                        <th>Nome do Setor</th>
+                        <th>Gestor Responsável</th>
+                        <th style="width: 15%; text-align: center;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for setor in setores %}
+                    <tr>
+                        <td>{{ setor.nome_setor }}</td>
+                        <td>{{ setor.nome_gestor or 'Nenhum gestor definido' }}</td>
+                        <td style="text-align: center;">
+                            <a href="{{ url_for('editar_setor', id=setor.id) }}" class="btn-action btn-edit" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center; padding: 30px;">
+                            <i class="fas fa-sitemap" style="font-size: 3rem; color: #6c757d; margin-bottom: 15px; opacity: 0.5;"></i>
+                            <p style="color: #6c757d; margin: 0;">Nenhum setor encontrado.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 
 <div id="modal-novo-setor" class="modal-overlay hidden">
