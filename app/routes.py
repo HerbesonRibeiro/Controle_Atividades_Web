@@ -708,7 +708,7 @@ dashboard_cache = {
     'Administrador': {'data': None, 'last_updated': None},
     'Gestor': {}  # Cache por gestor
 }
-CACHE_DURATION_MINUTES = 0
+CACHE_DURATION_MINUTES = 10
 
 @app.route('/dashboard')
 @login_required
