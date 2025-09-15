@@ -29,7 +29,7 @@
                 <i class="fas fa-user-check kpi-icon"></i>
             </div>
             <div class="kpi-card">
-                <h3>Setor com Mais Atividades (Geral)</h3>
+                <h3>Setor com Mais Atividades (Mês)</h3>
                 <p class="kpi-highlight">{{ dados_extras.setor_mais_ativo.nome_setor if dados_extras.setor_mais_ativo else 'N/A' }}</p>
                 <span class="kpi-subtext">{{ dados_extras.setor_mais_ativo.total_atividades if dados_extras.setor_mais_ativo else 0 }} atividades</span>
                 <i class="fas fa-building kpi-icon"></i>
@@ -62,7 +62,7 @@
             </div>
 
             <div class="info-card list-card">
-                <h3>Top 3 Atividades (Geral)</h3>
+                <h3>Top 3 Atividades (Mês)</h3>
                 <ul>
                     {% for atividade in dados_extras.get('top_atividades', []) %}
                     <li><span>{{ atividade.nome }}</span><span class="list-count">{{ atividade.total }}</span></li>

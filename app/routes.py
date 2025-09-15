@@ -702,12 +702,13 @@ def editar_setor(id):
 
     return render_template('editar_setor.html', setor=setor, colaboradores=colaboradores)
 
+#início da bloco DASHBOARD
 # Dicionário de cache, mantenha-o no topo do arquivo, fora de qualquer função
 dashboard_cache = {
     'Administrador': {'data': None, 'last_updated': None},
     'Gestor': {}  # Cache por gestor
 }
-CACHE_DURATION_MINUTES = 10
+CACHE_DURATION_MINUTES = 0
 
 @app.route('/dashboard')
 @login_required
@@ -737,29 +738,35 @@ def dashboard():
     labels_grafico = []
     datasets_grafico = []
 
+    # Pega o ano e mês atuais uma única vez
+    hoje = datetime.now()
+    ano_atual = hoje.year
+    mes_atual = hoje.month
+    params_mes = (ano_atual, mes_atual)
+
     # --- LÓGICA SE ADMINISTRADOR ---
     if perfil == 'Administrador':
-        # ... (seu código de administrador continua aqui, sem alterações) ...
         # KPIs
         kpis['total_atividades'] = db.execute_query("SELECT COUNT(id) AS total FROM atividades", fetch='one')['total']
         kpis['atividades_hoje'] = \
-            db.execute_query("SELECT COUNT(id) AS total FROM atividades WHERE DATE(data_atendimento) = CURDATE()",
-                             fetch='one')['total']
+        db.execute_query("SELECT COUNT(id) AS total FROM atividades WHERE DATE(data_atendimento) = CURDATE()",
+                         fetch='one')['total']
         kpis['total_colaboradores'] = \
-            db.execute_query("SELECT COUNT(id) AS total FROM colaboradores WHERE status = 'Ativo'", fetch='one')[
-                'total']
+        db.execute_query("SELECT COUNT(id) AS total FROM colaboradores WHERE status = 'Ativo'", fetch='one')['total']
 
-        # Cards Extras
-        query_setor_top = "SELECT s.nome_setor, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN setores s ON c.setor_id = s.id GROUP BY s.nome_setor ORDER BY total_atividades DESC LIMIT 1;"
-        dados_extras['setor_mais_ativo'] = db.execute_query(query_setor_top, fetch='one')
-        query_colab_top = "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1;"
-        dados_extras['colaborador_mais_ativo'] = db.execute_query(query_colab_top, fetch='one')
+        # Cards Extras (POR MÊS)
+        query_setor_top_mes = "SELECT s.nome_setor, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN setores s ON c.setor_id = s.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY s.nome_setor ORDER BY total_atividades DESC LIMIT 1;"
+        dados_extras['setor_mais_ativo'] = db.execute_query(query_setor_top_mes, params_mes, fetch='one')
+
+        query_colab_top_mes = "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1;"
+        dados_extras['colaborador_mais_ativo'] = db.execute_query(query_colab_top_mes, params_mes, fetch='one')
 
         # Listas
-        query_colab_setor = "SELECT s.nome_setor, COUNT(c.id) AS total_colaboradores FROM colaboradores c JOIN setores s ON c.setor_id = s.id WHERE c.status = 'Ativo' GROUP BY s.nome_setor ORDER BY total_colaboradores DESC;"
+        query_colab_setor = "SELECT s.id, s.nome_setor, COUNT(c.id) AS total_colaboradores FROM colaboradores c JOIN setores s ON c.setor_id = s.id WHERE c.status = 'Ativo' GROUP BY s.id, s.nome_setor ORDER BY total_colaboradores DESC;"
         dados_extras['colaboradores_por_setor'] = db.execute_query(query_colab_setor, fetch='all')
-        query_top_atividades = "SELECT ta.nome, COUNT(a.id) AS total FROM atividades a JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3;"
-        dados_extras['top_atividades'] = db.execute_query(query_top_atividades, fetch='all')
+
+        query_top_atividades_mes = "SELECT ta.nome, COUNT(a.id) AS total FROM atividades a JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3;"
+        dados_extras['top_atividades'] = db.execute_query(query_top_atividades_mes, params_mes, fetch='all')
 
         # Dados para o Gráfico (Empilhado por Setor)
         query_grafico = "SELECT DATE(a.data_atendimento) as dia, s.nome_setor, COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN setores s ON c.setor_id = s.id WHERE a.data_atendimento >= CURDATE() - INTERVAL 6 DAY GROUP BY dia, s.nome_setor ORDER BY dia ASC, s.nome_setor ASC;"
@@ -781,13 +788,12 @@ def dashboard():
 
     # --- LÓGICA DO GESTOR ---
     elif perfil == 'Gestor':
-        # ... (seu código de gestor continua aqui, sem alterações) ...
         query_setor = "SELECT id FROM setores WHERE gestor_id = %s"
         setor_gestor = db.execute_query(query_setor, (user_id,), fetch='one')
         if setor_gestor:
             setor_id = setor_gestor['id']
-            # ... (resto das suas queries de gestor)
             params = [setor_id]
+
             # KPIs
             kpis['total_atividades_setor'] = db.execute_query(
                 "SELECT COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s",
@@ -802,13 +808,23 @@ def dashboard():
             dados_extras['colaborador_top_setor'] = db.execute_query(
                 "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1",
                 tuple(params), fetch='one')
-            # Listas
+
+            # Cards e Listas (POR MÊS)
+            params_gestor_mes = (setor_id, ano_atual, mes_atual)
+
+            dados_extras['colaborador_top_setor'] = db.execute_query(
+                "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1",
+                params_gestor_mes, fetch='one')
+
             dados_extras['top_atividades_setor'] = db.execute_query(
-                "SELECT ta.nome, COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id WHERE c.setor_id = %s GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3",
-                tuple(params), fetch='all')
+                "SELECT ta.nome, COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id WHERE c.setor_id = %s AND YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3",
+                params_gestor_mes, fetch='all')
+
+            # Top Colaboradores do Setor (Geral, como já estava)
             dados_extras['top_colaboradores_setor'] = db.execute_query(
                 "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 3",
-                tuple(params), fetch='all')
+                (setor_id,), fetch='all')
+
             # Gráfico do Gestor (Empilhado por Colaborador)
             query_grafico = "SELECT DATE(a.data_atendimento) as dia, c.nome as colaborador, COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND a.data_atendimento >= CURDATE() - INTERVAL 6 DAY GROUP BY dia, colaborador ORDER BY dia ASC, colaborador ASC;"
             dados_brutos_grafico = db.execute_query(query_grafico, tuple(params), fetch='all')
@@ -838,37 +854,25 @@ def dashboard():
         WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s
     """
     params_top_colab_mes = [ano_atual, mes_atual]
-
-    # Adiciona o filtro de setor se for um gestor
     if perfil == 'Gestor' and 'setor_id' in locals():
         query_base_top_colab_mes += " AND c.setor_id = %s"
         params_top_colab_mes.append(setor_id)
+    #QUERY DO TOP 5 COLABORADORES
+    query_base_top_colab_mes += " GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 5;"
+    dados_extras['top_colaboradores_mes'] = db.execute_query(query_base_top_colab_mes, tuple(params_top_colab_mes),fetch='all')
 
-    # Finaliza e executa a query
-    query_base_top_colab_mes += """
-        GROUP BY c.id, c.nome 
-        ORDER BY total_atividades DESC 
-        LIMIT 5;
-    """
-    dados_extras['top_colaboradores_mes'] = db.execute_query(query_base_top_colab_mes, tuple(params_top_colab_mes),
-                                                             fetch='all')
 
     # Bônus: Formatar o nome do mês para exibir na tela
-    import locale
-    try:
-        # Tenta configurar para Português do Brasil (padrão Linux/macOS)
-        locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
-    except locale.Error:
-        try:
-            # Tenta configurar para o padrão Windows
-            locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil.1252')
-        except locale.Error:
-            # Se AMBOS falharem (como no Railway), ignora o erro e continua
-            print("AVISO: Locale 'pt_BR' não disponível no servidor. Usando o padrão do sistema (inglês).")
-            pass  # ESTA LINHA É A MUDANÇA CRÍTICA
+    hoje = datetime.now()
+    meses_em_portugues = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ]
+    # Pega o nome do mês da lista (hoje.month-1 porque a lista começa em 0)
+    nome_mes_pt = meses_em_portugues[hoje.month - 1]
 
-    hoje = datetime.now()  # Garanta que 'hoje' esteja definido aqui
-    dados_extras['mes_referencia'] = hoje.strftime("%B de %Y").capitalize()
+    # Cria a string final e a armazena no dicionário
+    dados_extras['mes_referencia'] = f"{nome_mes_pt} de {hoje.year}"
 
     # --- 5. MONTAGEM E CACHE DOS DADOS ---
     template_data = {
