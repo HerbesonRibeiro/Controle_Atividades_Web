@@ -1,6 +1,6 @@
 # Arquivo: app/routes.py
 from functools import wraps
-from flask import session, flash, redirect, url_for, render_template, request
+from flask import session, flash, redirect, url_for, render_template, request, jsonify
 from app import app
 from utils.db import Database
 import bcrypt
@@ -710,14 +710,34 @@ dashboard_cache = {
 }
 CACHE_DURATION_MINUTES = 10
 
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    perfil = session.get('colaborador_perfil')
-    user_id = session.get('colaborador_id')
+    # --- INÍCIO DA SEÇÃO DE PERSONIFICAÇÃO ---
+    perfil_original = session.get('colaborador_perfil')
+    user_id_original = session.get('colaborador_id')
+
+    view_as_user_id = request.args.get('view_as_user_id')
+    is_impersonating = False
+
+    if perfil_original == 'Administrador' and view_as_user_id:
+        query_gestor_alvo = "SELECT c.id, p.nome as perfil_nome FROM colaboradores c JOIN perfis p ON c.perfil_id = p.id WHERE c.id = %s"
+        gestor_alvo = db.execute_query(query_gestor_alvo, (view_as_user_id,), fetch='one')
+        if gestor_alvo and gestor_alvo['perfil_nome'] == 'Gestor':
+            perfil = 'Gestor'
+            user_id = gestor_alvo['id']
+            is_impersonating = True
+            print(f"INFO: Admin {user_id_original} está vendo o dashboard como Gestor {user_id}")
+        else:
+            perfil = perfil_original
+            user_id = user_id_original
+    else:
+        perfil = perfil_original
+        user_id = user_id_original
 
     # --- 1. CLÁUSULA DE GUARDA (Segurança) ---
-    if perfil == 'Colaborador':
+    if perfil_original == 'Colaborador':
         flash('Você não tem permissão para acessar o dashboard.', 'warning')
         return redirect(url_for('index'))
 
@@ -726,10 +746,17 @@ def dashboard():
     cache_key = str(user_id) if perfil == 'Gestor' else perfil
     cache_data_source = dashboard_cache['Gestor'] if perfil == 'Gestor' else dashboard_cache
     cache_entry = cache_data_source.get(cache_key)
-    if cache_entry and cache_entry.get('data') and (
+    if not is_impersonating and cache_entry and cache_entry.get('data') and (
             now < cache_entry.get('last_updated') + timedelta(minutes=CACHE_DURATION_MINUTES)):
         print(f"INFO: Servindo dashboard para {perfil} {user_id} via CACHE.")
-        return render_template('dashboard.html', **cache_entry['data'])
+        template_data = cache_entry['data']
+        gestores_disponiveis = []
+        if perfil_original == 'Administrador':
+            query_gestores = "SELECT c.id, c.nome, s.nome_setor as setor FROM colaboradores c JOIN perfis p ON c.perfil_id = p.id LEFT JOIN setores s ON c.setor_id = s.id WHERE p.nome = 'Gestor' AND c.status = 'Ativo' ORDER BY c.nome;"
+            gestores_disponiveis = db.execute_query(query_gestores, fetch='all')
+        template_data['gestores_disponiveis'] = gestores_disponiveis
+        template_data['is_impersonating'] = is_impersonating
+        return render_template('dashboard.html', **template_data)
 
     # --- 3. LÓGICA PRINCIPAL (Busca de dados no banco) ---
     print(f"INFO: Gerando dashboard para {perfil} {user_id} a partir do BANCO DE DADOS.")
@@ -738,7 +765,6 @@ def dashboard():
     labels_grafico = []
     datasets_grafico = []
 
-    # Pega o ano e mês atuais uma única vez
     hoje = datetime.now()
     ano_atual = hoje.year
     mes_atual = hoje.month
@@ -749,16 +775,17 @@ def dashboard():
         # KPIs
         kpis['total_atividades'] = db.execute_query("SELECT COUNT(id) AS total FROM atividades", fetch='one')['total']
         kpis['atividades_hoje'] = \
-        db.execute_query("SELECT COUNT(id) AS total FROM atividades WHERE DATE(data_atendimento) = CURDATE()",
-                         fetch='one')['total']
+            db.execute_query("SELECT COUNT(id) AS total FROM atividades WHERE DATE(data_atendimento) = CURDATE()",
+                             fetch='one')['total']
         kpis['total_colaboradores'] = \
-        db.execute_query("SELECT COUNT(id) AS total FROM colaboradores WHERE status = 'Ativo'", fetch='one')['total']
+            db.execute_query("SELECT COUNT(id) AS total FROM colaboradores WHERE status = 'Ativo'", fetch='one')[
+                'total']
 
         # Cards Extras (POR MÊS)
         query_setor_top_mes = "SELECT s.nome_setor, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN setores s ON c.setor_id = s.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY s.nome_setor ORDER BY total_atividades DESC LIMIT 1;"
         dados_extras['setor_mais_ativo'] = db.execute_query(query_setor_top_mes, params_mes, fetch='one')
 
-        query_colab_top_mes = "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1;"
+        query_colab_top_mes = "SELECT c.id, c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1;"
         dados_extras['colaborador_mais_ativo'] = db.execute_query(query_colab_top_mes, params_mes, fetch='one')
 
         # Listas
@@ -841,14 +868,9 @@ def dashboard():
                     datasets_grafico.append({'label': colaborador, 'data': dados_por_colaborador[colaborador],
                                              'backgroundColor': cores[i % len(cores)]})
 
-    # --- 4. CONSULTAS COMUNS E DE REFINAMENTO (NOVA SEÇÃO) ---
-    hoje = datetime.now()
-    ano_atual = hoje.year
-    mes_atual = hoje.month
-
-    # Consulta base para top 5 colaboradores
+ # --- 4. CONSULTAS COMUNS E DE REFINAMENTO ---
     query_base_top_colab_mes = """
-        SELECT c.nome, COUNT(a.id) AS total_atividades 
+        SELECT c.id, c.nome, COUNT(a.id) AS total_atividades 
         FROM atividades a 
         JOIN colaboradores c ON a.colaborador_id = c.id 
         WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s
@@ -857,24 +879,14 @@ def dashboard():
     if perfil == 'Gestor' and 'setor_id' in locals():
         query_base_top_colab_mes += " AND c.setor_id = %s"
         params_top_colab_mes.append(setor_id)
-    #QUERY DO TOP 5 COLABORADORES
     query_base_top_colab_mes += " GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 5;"
-    dados_extras['top_colaboradores_mes'] = db.execute_query(query_base_top_colab_mes, tuple(params_top_colab_mes),fetch='all')
+    dados_extras['top_colaboradores_mes'] = db.execute_query(query_base_top_colab_mes, tuple(params_top_colab_mes), fetch='all')
 
-
-    # Bônus: Formatar o nome do mês para exibir na tela
-    hoje = datetime.now()
-    meses_em_portugues = [
-        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ]
-    # Pega o nome do mês da lista (hoje.month-1 porque a lista começa em 0)
+    meses_em_portugues = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
     nome_mes_pt = meses_em_portugues[hoje.month - 1]
-
-    # Cria a string final e a armazena no dicionário
     dados_extras['mes_referencia'] = f"{nome_mes_pt} de {hoje.year}"
 
-    # --- 5. MONTAGEM E CACHE DOS DADOS ---
+    # --- 5. MONTAGEM DOS DADOS PARA CACHE E TEMPLATE ---
     template_data = {
         'kpis': kpis,
         'dados_extras': dados_extras,
@@ -882,16 +894,54 @@ def dashboard():
         'datasets_grafico': datasets_grafico
     }
 
-    cache_entry_to_update = dashboard_cache['Gestor'].get(cache_key) if perfil == 'Gestor' else dashboard_cache.get(
-        perfil)
-    if cache_entry_to_update is not None:
-        cache_entry_to_update['data'] = template_data
-        cache_entry_to_update['last_updated'] = now
-    else:  # Primeiro acesso do gestor
-        if perfil == 'Gestor':
-            dashboard_cache['Gestor'][cache_key] = {'data': template_data, 'last_updated': now}
+    if not is_impersonating:
+        cache_entry_to_update = dashboard_cache['Gestor'].get(cache_key) if perfil == 'Gestor' else dashboard_cache.get(perfil)
+        if cache_entry_to_update is not None:
+            cache_entry_to_update['data'] = template_data
+            cache_entry_to_update['last_updated'] = now
         else:
-            dashboard_cache[perfil] = {'data': template_data, 'last_updated': now}
+            if perfil == 'Gestor':
+                dashboard_cache['Gestor'][cache_key] = {'data': template_data, 'last_updated': now}
+            else:
+                dashboard_cache[perfil] = {'data': template_data, 'last_updated': now}
 
-    # --- 6. SAÍDA ÚNICA E UNIFICADA ---
+    # --- 6. PREPARAÇÃO FINAL E SAÍDA ---
+    gestores_disponiveis = []
+    if perfil_original == 'Administrador':
+        query_gestores = "SELECT c.id, c.nome, s.nome_setor as setor FROM colaboradores c JOIN perfis p ON c.perfil_id = p.id LEFT JOIN setores s ON c.setor_id = s.id WHERE p.nome = 'Gestor' AND c.status = 'Ativo' ORDER BY c.nome;"
+        gestores_disponiveis = db.execute_query(query_gestores, fetch='all')
+
+    template_data['gestores_disponiveis'] = gestores_disponiveis
+    template_data['is_impersonating'] = is_impersonating
+
     return render_template('dashboard.html', **template_data)
+
+
+@app.route('/api/atividades-hoje-por-setor')
+@login_required
+def api_atividades_hoje_por_setor():
+    # Segurança: Apenas administradores podem acessar esta informação
+    if session.get('colaborador_perfil') != 'Administrador':
+        return jsonify({'error': 'Acesso negado'}), 403
+
+    # Consulta SQL para buscar o total de atividades de hoje, agrupado por setor
+    query = """
+        SELECT 
+            s.id as setor_id, 
+            s.nome_setor, 
+            COUNT(a.id) as total
+        FROM atividades a
+        JOIN colaboradores c ON a.colaborador_id = c.id
+        JOIN setores s ON c.setor_id = s.id
+        WHERE DATE(a.data_atendimento) = CURDATE()
+        GROUP BY s.id, s.nome_setor
+        ORDER BY total DESC;
+    """
+
+    try:
+        dados = db.execute_query(query, fetch='all')
+        # A função jsonify do Flask converte a lista de dicionários do Python para o formato JSON
+        return jsonify(dados)
+    except Exception as e:
+        print(f"Erro na API de atividades por setor: {e}")
+        return jsonify({'error': 'Erro ao buscar dados'}), 500

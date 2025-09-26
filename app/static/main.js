@@ -140,3 +140,63 @@ document.addEventListener('DOMContentLoaded', function() {
         updateCounterAndButtons();
     }
 });
+
+// Função para ABRIR o modal de atividades de hoje por setor (VERSÃO CORRIGIDA)
+function abrirModalSetoresHoje() {
+    const modal = document.getElementById('modal-hoje-setor');
+    const modalBody = document.getElementById('modal-body-setores');
+
+    if (!modal || !modalBody) return; // Segurança
+
+    // 1. Limpa a tabela e mostra uma mensagem de "Carregando..."
+    modalBody.innerHTML = '<tr><td colspan="2">Carregando...</td></tr>';
+
+    // 2. Mostra o modal
+    modal.style.display = 'flex';
+
+    // 3. Busca os dados da nossa nova API
+    fetch('/api/atividades-hoje-por-setor')
+        .then(response => {
+            if (!response.ok) { // Verifica se a resposta da API foi bem-sucedida
+                throw new Error('Erro na resposta da rede: ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // 4. Limpa a mensagem de "Carregando..."
+            modalBody.innerHTML = '';
+
+            // 5. Verifica se algum dado foi retornado
+            if (data.length === 0) {
+                modalBody.innerHTML = '<tr><td colspan="2">Nenhuma atividade registrada hoje.</td></tr>';
+                return;
+            }
+
+            // 6. Cria as linhas da tabela com os dados recebidos
+            data.forEach(item => {
+                // Cria o link para a página de histórico, passando os filtros
+                const link = `/historico?filtro_setor=${item.setor_id}&filtro_data=hoje`;
+
+                const row = `
+                    <tr>
+                        <td><a href="${link}">${item.nome_setor}</a></td>
+                        <td>${item.total}</td>
+                    </tr>
+                `;
+                modalBody.innerHTML += row;
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao buscar dados para o modal:', error);
+            modalBody.innerHTML = '<tr><td colspan="2">Ocorreu um erro ao carregar os dados. Verifique o console.</td></tr>';
+        });
+}
+
+// Função para FECHAR o modal (agora está aqui, completa e correta)
+function fecharModalSetoresHoje() {
+    const modal = document.getElementById('modal-hoje-setor');
+
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
