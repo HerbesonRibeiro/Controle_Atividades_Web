@@ -142,44 +142,41 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Função para ABRIR o modal de atividades de hoje por setor (VERSÃO CORRIGIDA)
-function abrirModalSetoresHoje() {
+function abrirModalAtividadesHoje() {
     const modal = document.getElementById('modal-hoje-setor');
+    if (modal) {
+        modal.style.display = 'flex';
+        // Chama a função que carrega o primeiro estágio (a lista de setores)
+        carregarDadosModalSetores();
+    }
+}
+
+// Função para carregar o ESTÁGIO 1: A lista de Setores.
+function carregarDadosModalSetores() {
     const modalBody = document.getElementById('modal-body-setores');
+    const modalTitle = document.getElementById('modal-title');
+    const backBtn = document.getElementById('modal-back-btn');
 
-    if (!modal || !modalBody) return; // Segurança
+    // Prepara o modal para a visão de setores
+    if(modalTitle) modalTitle.innerText = 'Atividades de Hoje por Setor';
+    if(backBtn) backBtn.style.display = 'none'; // Esconde o botão "Voltar"
+    if(!modalBody) return;
 
-    // 1. Limpa a tabela e mostra uma mensagem de "Carregando..."
     modalBody.innerHTML = '<tr><td colspan="2">Carregando...</td></tr>';
 
-    // 2. Mostra o modal
-    modal.style.display = 'flex';
-
-    // 3. Busca os dados da nossa nova API
     fetch('/api/atividades-hoje-por-setor')
-        .then(response => {
-            if (!response.ok) { // Verifica se a resposta da API foi bem-sucedida
-                throw new Error('Erro na resposta da rede: ' + response.statusText);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            // 4. Limpa a mensagem de "Carregando..."
             modalBody.innerHTML = '';
-
-            // 5. Verifica se algum dado foi retornado
             if (data.length === 0) {
                 modalBody.innerHTML = '<tr><td colspan="2">Nenhuma atividade registrada hoje.</td></tr>';
                 return;
             }
-
-            // 6. Cria as linhas da tabela com os dados recebidos
+            // Constrói a tabela de setores
             data.forEach(item => {
-                // Cria o link para a página de histórico, passando os filtros
-                const link = `/historico?filtro_setor=${item.setor_id}&filtro_data=hoje`;
-
                 const row = `
-                    <tr>
-                        <td><a href="${link}">${item.nome_setor}</a></td>
+                    <tr onclick="carregarDadosModalColaboradores(${item.setor_id}, '${item.nome_setor}')" style="cursor: pointer;" title="Ver detalhes de ${item.nome_setor}">
+                        <td>${item.nome_setor}</td>
                         <td>${item.total}</td>
                     </tr>
                 `;
@@ -187,15 +184,52 @@ function abrirModalSetoresHoje() {
             });
         })
         .catch(error => {
-            console.error('Erro ao buscar dados para o modal:', error);
-            modalBody.innerHTML = '<tr><td colspan="2">Ocorreu um erro ao carregar os dados. Verifique o console.</td></tr>';
+            console.error('Erro ao buscar dados dos setores:', error);
+            modalBody.innerHTML = '<tr><td colspan="2">Ocorreu um erro ao carregar os dados.</td></tr>';
         });
 }
 
-// Função para FECHAR o modal (agora está aqui, completa e correta)
+// Função para carregar o ESTÁGIO 2: A lista de Colaboradores de um setor.
+function carregarDadosModalColaboradores(setorId, setorNome) {
+    const modalBody = document.getElementById('modal-body-setores');
+    const modalTitle = document.getElementById('modal-title');
+    const backBtn = document.getElementById('modal-back-btn');
+
+    // Prepara o modal para a visão de colaboradores
+    if(modalTitle) modalTitle.innerText = `Atividades Hoje - ${setorNome}`;
+    if(backBtn) backBtn.style.display = 'block'; // Mostra o botão "Voltar"
+    if(!modalBody) return;
+
+    modalBody.innerHTML = '<tr><td colspan="2">Carregando...</td></tr>';
+
+    fetch(`/api/atividades-hoje-por-colaborador/${setorId}`)
+        .then(response => response.json())
+        .then(data => {
+            modalBody.innerHTML = '';
+            if (data.length === 0) {
+                modalBody.innerHTML = '<tr><td colspan="2">Nenhum colaborador ativo neste setor.</td></tr>';
+                return;
+            }
+            // Constrói a tabela de colaboradores
+            data.forEach(item => {
+                const row = `
+                    <tr>
+                        <td>${item.nome}</td>
+                        <td>${item.total}</td>
+                    </tr>
+                `;
+                modalBody.innerHTML += row;
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao buscar dados dos colaboradores:', error);
+            modalBody.innerHTML = '<tr><td colspan="2">Ocorreu um erro ao carregar os dados.</td></tr>';
+        });
+}
+
+// Função para FECHAR o modal (continua a mesma)
 function fecharModalSetoresHoje() {
     const modal = document.getElementById('modal-hoje-setor');
-
     if (modal) {
         modal.style.display = 'none';
     }

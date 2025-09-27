@@ -1459,3 +1459,49 @@ body.sidebar-collapsed .content {
     transform: translateY(-3px); /* Efeito sutil de "levantar" o card */
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
+/* Opção 1: Estilo de Botão de Ícone */
+.modal-back-btn.icon-btn {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    color: #555;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 50%; /* Deixa o botão redondo */
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+.modal-back-btn.icon-btn:hover {
+    background-color: #e0e0e0;
+    border-color: #ccc;
+}
+
+/* --- ESTILOS PARA AS MEDALHAS NA SIDEBAR --- */
+.sidebar-medals {
+    padding: 10px 15px;
+    background-color: rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.medal-item {
+    color: #f1f1f1;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.medal-item i {
+    font-size: 1.2rem;
+}
+/* Cores das medalhas que já adicionamos antes */
+.fa-medal.gold { color: #FFD700; }
+.fa-medal.silver { color: #C0C0C0; }
+.fa-medal.bronze { color: #CD7F32; }

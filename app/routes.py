@@ -31,6 +31,8 @@ def historico():
     lista_colaboradores = db.execute_query("SELECT id, nome FROM colaboradores ORDER BY nome", fetch='all') or []
     lista_setores = db.execute_query("SELECT id, nome_setor FROM setores ORDER BY nome_setor", fetch='all') or []
 
+    filtro_data_especial = request.args.get('filtro_data')
+
     # --- Construção da Query Dinâmica ---
     base_query_from = """
         FROM atividades a
@@ -81,6 +83,13 @@ def historico():
     if filtros_aplicados.get('descricao_filtro'):
         where_clauses.append("a.descricao LIKE %s")
         params.append(f"%{filtros_aplicados['descricao_filtro']}%")
+    if filtro_data_especial == 'hoje':
+        where_clauses.append("DATE(a.data_atendimento) = CURDATE()")
+        # Bônus: para que o formulário mostre a data de hoje nos campos
+        from datetime import date
+        today_str = date.today().isoformat()
+        filtros_aplicados['data_ini'] = today_str
+        filtros_aplicados['data_fim'] = today_str
 
     where_sql = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
@@ -115,6 +124,7 @@ def login():
                 c.nome, 
                 c.senha, 
                 c.status,
+                c.setor_id,
                 p.nome AS nome_perfil
             FROM colaboradores c
             JOIN perfis p ON c.perfil_id = p.id
@@ -128,6 +138,7 @@ def login():
                 session['colaborador_id'] = colaborador['id']
                 session['colaborador_nome'] = colaborador['nome']
                 session['colaborador_perfil'] = colaborador['nome_perfil']
+                session['colaborador_setor_id'] = colaborador['setor_id']
                 flash('Login realizado com sucesso!', 'success')
                 return redirect(url_for('index'))
             else:
@@ -708,7 +719,7 @@ dashboard_cache = {
     'Administrador': {'data': None, 'last_updated': None},
     'Gestor': {}  # Cache por gestor
 }
-CACHE_DURATION_MINUTES = 10
+CACHE_DURATION_MINUTES = 360
 
 
 @app.route('/dashboard')
@@ -814,6 +825,7 @@ def dashboard():
                     {'label': setor, 'data': dados_por_setor[setor], 'backgroundColor': cores[i % len(cores)]})
 
     # --- LÓGICA DO GESTOR ---
+
     elif perfil == 'Gestor':
         query_setor = "SELECT id FROM setores WHERE gestor_id = %s"
         setor_gestor = db.execute_query(query_setor, (user_id,), fetch='one')
@@ -945,3 +957,98 @@ def api_atividades_hoje_por_setor():
     except Exception as e:
         print(f"Erro na API de atividades por setor: {e}")
         return jsonify({'error': 'Erro ao buscar dados'}), 500
+
+
+# Em app/routes.py, após a rota api_atividades_hoje_por_setor
+
+@app.route('/api/atividades-hoje-por-colaborador/<int:setor_id>')
+@login_required
+def api_atividades_hoje_por_colaborador(setor_id):
+    # Segurança: Apenas administradores podem acessar
+    if session.get('colaborador_perfil') != 'Administrador':
+        return jsonify({'error': 'Acesso negado'}), 403
+
+    # Esta consulta é mais complexa. Usamos LEFT JOIN para garantir
+    # que TODOS os colaboradores ativos do setor apareçam, mesmo os com 0 atividades.
+    query = """
+        SELECT 
+            c.nome, 
+            COUNT(a.id) AS total
+        FROM colaboradores c
+        LEFT JOIN atividades a ON c.id = a.colaborador_id AND DATE(a.data_atendimento) = CURDATE()
+        WHERE c.setor_id = %s AND c.status = 'Ativo'
+        GROUP BY c.id, c.nome
+        ORDER BY total DESC, c.nome ASC;
+    """
+
+    try:
+        dados = db.execute_query(query, (setor_id,), fetch='all')
+        return jsonify(dados)
+    except Exception as e:
+        print(f"Erro na API de atividades por colaborador: {e}")
+        return jsonify({'error': 'Erro ao buscar dados'}), 500
+
+# Criação de medalhas
+@app.context_processor
+def inject_user_medals():
+    # ADICIONE ESTE PRINT BEM NO INÍCIO PARA VER O QUE ESTÁ NA SESSION
+    print(f"DEBUG SESSION - Perfil: {session.get('colaborador_perfil')}, ID: {session.get('colaborador_id')}, Setor ID: {session.get('colaborador_setor_id')}")
+
+    # Dicionário padrão, caso o usuário não seja um colaborador
+    medals_data = {
+        'medalha_setor': None,
+        'medalha_geral': None
+    }
+
+    # Só executa a lógica se um colaborador estiver logado
+    if 'colaborador_id' in session and session['colaborador_perfil'] == 'Colaborador':
+        user_id = session.get('colaborador_id')
+        user_setor_id = session.get('colaborador_setor_id')
+
+        # Evita erro se o colaborador não tiver setor definido
+        if not user_setor_id:
+            return medals_data
+
+        try:
+            # Query 1: Calcula o ranking do colaborador DENTRO DO SEU SETOR
+            query_rank_setor = """
+                SELECT user_rank FROM (
+                    SELECT c.id, RANK() OVER (ORDER BY COUNT(a.id) DESC) as user_rank
+                    FROM colaboradores c
+                    LEFT JOIN atividades a ON c.id = a.colaborador_id AND MONTH(a.data_atendimento) = MONTH(CURDATE()) AND YEAR(a.data_atendimento) = YEAR(CURDATE())
+                    WHERE c.setor_id = %s AND c.status = 'Ativo'
+                    GROUP BY c.id
+                ) as ranked_users
+                WHERE id = %s;
+            """
+            rank_setor_result = db.execute_query(query_rank_setor, (user_setor_id, user_id), fetch='one')
+            if rank_setor_result:
+                medals_data['medalha_setor'] = rank_setor_result['user_rank']
+
+            # ADICIONADO PARA DEPURAR
+            print(f"DEBUG MEDALHAS - Usuário ID {user_id}, Rank Setor: {medals_data['medalha_setor']}")
+
+            # Query 2: Calcula o ranking GERAL do colaborador
+            query_rank_geral = """
+                SELECT user_rank FROM (
+                    SELECT c.id, RANK() OVER (ORDER BY COUNT(a.id) DESC) as user_rank
+                    FROM colaboradores c
+                    LEFT JOIN atividades a ON c.id = a.colaborador_id AND MONTH(a.data_atendimento) = MONTH(CURDATE()) AND YEAR(a.data_atendimento) = YEAR(CURDATE())
+                    WHERE c.status = 'Ativo'
+                    GROUP BY c.id
+                ) as ranked_users
+                WHERE id = %s;
+            """
+            rank_geral_result = db.execute_query(query_rank_geral, (user_id,), fetch='one')
+            if rank_geral_result:
+                medals_data['medalha_geral'] = rank_geral_result['user_rank']
+
+            # ADICIONADO PARA DEPURAR
+            print(f"DEBUG MEDALHAS - Usuário ID {user_id}, Rank Geral: {medals_data['medalha_geral']}")
+
+        except Exception as e:
+            # ADICIONADO PARA DEPURAR
+            print(f"ERRO AO CALCULAR MEDALHAS: {e}")
+
+    # O return fica no final da função principal
+    return medals_data

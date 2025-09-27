@@ -47,11 +47,13 @@
                     <p class="kpi-number">{{ kpis.get('total_atividades_setor', 0) }}</p>
                     <i class="fas fa-tasks kpi-icon"></i>
                 </div>
-                <div class="kpi-card">
-                    <h3>Atividades Hoje (Setor)</h3>
-                    <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
-                    <i class="fas fa-calendar-day kpi-icon"></i>
-                </div>
+                <a href="{{ url_for('historico', setor_filtro=dados_extras.setor_id_gestor, filtro_data='hoje') }}" class="kpi-link">
+                    <div class="kpi-card">
+                        <h3>Atividades Hoje (Setor)</h3>
+                        <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
+                        <i class="fas fa-calendar-day kpi-icon"></i>
+                    </div>
+                </a>
                 <div class="kpi-card">
                     <h3>Colaboradores no Setor</h3>
                     <p class="kpi-number">{{ kpis.get('total_colaboradores_setor', 0) }}</p>
@@ -102,7 +104,7 @@
                     <i class="fas fa-tasks kpi-icon"></i>
                 </div>
 
-                <div id="kpi-atividades-hoje-admin" class="kpi-card clickable" onclick="abrirModalSetoresHoje()">
+                <div id="kpi-atividades-hoje-admin" class="kpi-card clickable" onclick="abrirModalAtividadesHoje()">
                     <h3>Atividades Hoje</h3>
                     <p class="kpi-number">{{ kpis.get('atividades_hoje', 0) }}</p>
                     <i class="fas fa-calendar-day kpi-icon"></i>
@@ -167,11 +169,13 @@
                 <p class="kpi-number">{{ kpis.get('total_atividades_setor', 0) }}</p>
                 <i class="fas fa-tasks kpi-icon"></i>
             </div>
-            <div class="kpi-card">
-                <h3>Atividades Hoje (Setor)</h3>
-                <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
-                <i class="fas fa-calendar-day kpi-icon"></i>
-            </div>
+            <a href="{{ url_for('historico', setor_filtro=dados_extras.setor_id_gestor, filtro_data='hoje') }}" class="kpi-link">
+                <div class="kpi-card">
+                    <h3>Atividades Hoje (Setor)</h3>
+                    <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
+                    <i class="fas fa-calendar-day kpi-icon"></i>
+                </div>
+            </a>
             <div class="kpi-card">
                 <h3>Colaboradores no Setor</h3>
                 <p class="kpi-number">{{ kpis.get('total_colaboradores_setor', 0) }}</p>
@@ -285,7 +289,10 @@
 <div id="modal-hoje-setor" class="modal-overlay" style="display: none;">
     <div class="modal-container">
         <div class="modal-header">
-            <h2>Atividades de Hoje por Setor</h2>
+            <button id="modal-back-btn" class="modal-back-btn icon-btn" onclick="carregarDadosModalSetores()" style="display: none;" title="Voltar">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 id="modal-title">Atividades de Hoje por Setor</h2>
             <button class="modal-close-btn" onclick="fecharModalSetoresHoje()">&times;</button>
         </div>
         <div class="modal-body">
