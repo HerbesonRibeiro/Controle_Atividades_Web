@@ -719,7 +719,7 @@ dashboard_cache = {
     'Administrador': {'data': None, 'last_updated': None},
     'Gestor': {}  # Cache por gestor
 }
-CACHE_DURATION_MINUTES = 360
+CACHE_DURATION_MINUTES = 60
 
 def get_dados_extras_setor(db, setor_id):
     """Busca dados adicionais para o dashboard do Gestor, como rankings do mês."""
@@ -750,6 +750,13 @@ def get_dados_extras_setor(db, setor_id):
     dados['top_atividades_setor'] = db.execute_query(query_top_atividades, params_gestor_mes, fetch='all')
 
     return dados
+#início da bloco DASHBOARD
+# Dicionário de cache, mantenha-o no topo do arquivo, fora de qualquer função
+dashboard_cache = {
+    'Administrador': {'data': None, 'last_updated': None},
+    'Gestor': {}  # Cache por gestor
+}
+CACHE_DURATION_MINUTES = 360
 
 @app.route('/dashboard')
 @login_required
