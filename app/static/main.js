@@ -142,24 +142,33 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Função para ABRIR o modal de atividades de hoje por setor (VERSÃO CORRIGIDA)
+// Função de entrada para o ADMINISTRADOR
 function abrirModalAtividadesHoje() {
     const modal = document.getElementById('modal-hoje-setor');
     if (modal) {
         modal.style.display = 'flex';
-        // Chama a função que carrega o primeiro estágio (a lista de setores)
         carregarDadosModalSetores();
     }
 }
 
-// Função para carregar o ESTÁGIO 1: A lista de Setores.
+// NOVA Função de entrada para o GESTOR
+function abrirModalColaboradoresGestor(setorId, setorNome) {
+    const modal = document.getElementById('modal-hoje-setor');
+    if (modal) {
+        modal.style.display = 'flex';
+        // Chama direto o estágio 2, e diz para NÃO mostrar o botão "Voltar"
+        carregarDadosModalColaboradores(setorId, setorNome, false);
+    }
+}
+
+// Função para carregar o ESTÁGIO 1: A lista de Setores (só para Admin)
 function carregarDadosModalSetores() {
     const modalBody = document.getElementById('modal-body-setores');
     const modalTitle = document.getElementById('modal-title');
     const backBtn = document.getElementById('modal-back-btn');
 
-    // Prepara o modal para a visão de setores
     if(modalTitle) modalTitle.innerText = 'Atividades de Hoje por Setor';
-    if(backBtn) backBtn.style.display = 'none'; // Esconde o botão "Voltar"
+    if(backBtn) backBtn.style.display = 'none';
     if(!modalBody) return;
 
     modalBody.innerHTML = '<tr><td colspan="2">Carregando...</td></tr>';
@@ -172,7 +181,6 @@ function carregarDadosModalSetores() {
                 modalBody.innerHTML = '<tr><td colspan="2">Nenhuma atividade registrada hoje.</td></tr>';
                 return;
             }
-            // Constrói a tabela de setores
             data.forEach(item => {
                 const row = `
                     <tr onclick="carregarDadosModalColaboradores(${item.setor_id}, '${item.nome_setor}')" style="cursor: pointer;" title="Ver detalhes de ${item.nome_setor}">
@@ -189,15 +197,15 @@ function carregarDadosModalSetores() {
         });
 }
 
-// Função para carregar o ESTÁGIO 2: A lista de Colaboradores de um setor.
-function carregarDadosModalColaboradores(setorId, setorNome) {
+// Função para carregar o ESTÁGIO 2: A lista de Colaboradores (agora mais inteligente)
+function carregarDadosModalColaboradores(setorId, setorNome, showBackButton = true) {
     const modalBody = document.getElementById('modal-body-setores');
     const modalTitle = document.getElementById('modal-title');
     const backBtn = document.getElementById('modal-back-btn');
 
-    // Prepara o modal para a visão de colaboradores
     if(modalTitle) modalTitle.innerText = `Atividades Hoje - ${setorNome}`;
-    if(backBtn) backBtn.style.display = 'block'; // Mostra o botão "Voltar"
+    // AQUI ESTÁ A MÁGICA: mostra ou esconde o botão "Voltar" com base no parâmetro
+    if(backBtn) backBtn.style.display = showBackButton ? 'block' : 'none';
     if(!modalBody) return;
 
     modalBody.innerHTML = '<tr><td colspan="2">Carregando...</td></tr>';
@@ -210,7 +218,6 @@ function carregarDadosModalColaboradores(setorId, setorNome) {
                 modalBody.innerHTML = '<tr><td colspan="2">Nenhum colaborador ativo neste setor.</td></tr>';
                 return;
             }
-            // Constrói a tabela de colaboradores
             data.forEach(item => {
                 const row = `
                     <tr>

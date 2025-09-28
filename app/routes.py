@@ -721,6 +721,35 @@ dashboard_cache = {
 }
 CACHE_DURATION_MINUTES = 360
 
+def get_dados_extras_setor(db, setor_id):
+    """Busca dados adicionais para o dashboard do Gestor, como rankings do mês."""
+    dados = {}
+    hoje = datetime.now()
+    ano_atual = hoje.year
+    mes_atual = hoje.month
+    params_gestor_mes = (setor_id, ano_atual, mes_atual)
+
+    # Query para o Destaque do Setor (Mês)
+    query_destaque = """
+        SELECT c.nome, COUNT(a.id) AS total_atividades
+        FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id
+        WHERE c.setor_id = %s AND YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s
+        GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1;
+    """
+    dados['colaborador_top_setor'] = db.execute_query(query_destaque, params_gestor_mes, fetch='one')
+
+    # Query para o Top 3 Atividades do Setor (Mês)
+    query_top_atividades = """
+        SELECT ta.nome, COUNT(a.id) AS total
+        FROM atividades a
+        JOIN colaboradores c ON a.colaborador_id = c.id
+        JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id
+        WHERE c.setor_id = %s AND YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s
+        GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3;
+    """
+    dados['top_atividades_setor'] = db.execute_query(query_top_atividades, params_gestor_mes, fetch='all')
+
+    return dados
 
 @app.route('/dashboard')
 @login_required
@@ -827,39 +856,67 @@ def dashboard():
     # --- LÓGICA DO GESTOR ---
 
     elif perfil == 'Gestor':
-        query_setor = "SELECT id FROM setores WHERE gestor_id = %s"
+
+        # A ÚNICA responsabilidade deste bloco é descobrir o ID e NOME do setor do gestor.
+        query_setor = "SELECT id, nome_setor FROM setores WHERE gestor_id = %s"
         setor_gestor = db.execute_query(query_setor, (user_id,), fetch='one')
+
         if setor_gestor:
             setor_id = setor_gestor['id']
-            params = [setor_id]
 
-            # KPIs
+            # Enviamos as informações para o template para o modal funcionar
+
+            dados_extras['setor_id_gestor'] = setor_id
+            dados_extras['setor_nome_gestor'] = setor_gestor['nome_setor']
+
+            # KPIs específicos do setor (calculados aqui pois não são comuns)
+
             kpis['total_atividades_setor'] = db.execute_query(
-                "SELECT COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s",
-                tuple(params), fetch='one')['total']
+                "SELECT COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s",
+                (setor_id,), fetch='one')['total']
             kpis['atividades_hoje_setor'] = db.execute_query(
-                "SELECT COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND DATE(a.data_atendimento) = CURDATE()",
-                tuple(params), fetch='one')['total']
+                "SELECT COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND DATE(a.data_atendimento) = CURDATE()",
+                (setor_id,), fetch='one')['total']
             kpis['total_colaboradores_setor'] = \
-                db.execute_query(
-                    "SELECT COUNT(id) AS total FROM colaboradores WHERE setor_id = %s AND status = 'Ativo'",
-                    tuple(params), fetch='one')['total']
-            dados_extras['colaborador_top_setor'] = db.execute_query(
-                "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1",
-                tuple(params), fetch='one')
+            db.execute_query("SELECT COUNT(id) as total FROM colaboradores WHERE setor_id = %s AND status='Ativo'",
+                             (setor_id,), fetch='one')['total']
+            dados_extras.update(get_dados_extras_setor(db, setor_id))
 
+            # Gráfico do Gestor
+
+            query_grafico = "SELECT DATE(a.data_atendimento) as dia, c.nome as colaborador, COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND a.data_atendimento >= CURDATE() - INTERVAL 6 DAY GROUP BY dia, colaborador ORDER BY dia ASC, colaborador ASC;"
+            dados_brutos_grafico = db.execute_query(query_grafico, (setor_id,), fetch='all')
+            if dados_brutos_grafico:
+                labels_grafico = sorted(list(set([d['dia'].strftime('%d/%m') for d in dados_brutos_grafico])))
+                colaboradores = sorted(list(set([d['colaborador'] for d in dados_brutos_grafico])))
+                dados_por_colaborador = {colab: [0] * len(labels_grafico) for colab in colaboradores}
+
+                for dado in dados_brutos_grafico:
+                    label_index = labels_grafico.index(dado['dia'].strftime('%d/%m'))
+                    dados_por_colaborador[dado['colaborador']][label_index] = dado['total']
+
+                cores = ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)',
+                         'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)']
+
+                for i, colaborador in enumerate(colaboradores):
+                    datasets_grafico.append({'label': colaborador, 'data': dados_por_colaborador[colaborador],
+                                             'backgroundColor': cores[i % len(cores)]})
+
+        else:
+            # Lida com o caso de um gestor que não tem setor associado
+
+            kpis.update({'total_atividades_setor': 0, 'atividades_hoje_setor': 0, 'total_colaboradores_setor': 0})
+            dados_extras['setor_nome_gestor'] = "Nenhum Setor"
             # Cards e Listas (POR MÊS)
             params_gestor_mes = (setor_id, ano_atual, mes_atual)
-
             dados_extras['colaborador_top_setor'] = db.execute_query(
                 "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 1",
                 params_gestor_mes, fetch='one')
-
             dados_extras['top_atividades_setor'] = db.execute_query(
                 "SELECT ta.nome, COUNT(a.id) AS total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id WHERE c.setor_id = %s AND YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3",
                 params_gestor_mes, fetch='all')
 
-            # Top Colaboradores do Setor (Geral, como já estava)
+            # Top Colaboradores do Setor (Geral)
             dados_extras['top_colaboradores_setor'] = db.execute_query(
                 "SELECT c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 3",
                 (setor_id,), fetch='all')

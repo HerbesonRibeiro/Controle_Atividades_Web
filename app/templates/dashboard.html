@@ -47,13 +47,11 @@
                     <p class="kpi-number">{{ kpis.get('total_atividades_setor', 0) }}</p>
                     <i class="fas fa-tasks kpi-icon"></i>
                 </div>
-                <a href="{{ url_for('historico', setor_filtro=dados_extras.setor_id_gestor, filtro_data='hoje') }}" class="kpi-link">
-                    <div class="kpi-card">
-                        <h3>Atividades Hoje (Setor)</h3>
-                        <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
-                        <i class="fas fa-calendar-day kpi-icon"></i>
-                    </div>
-                </a>
+                <div class="kpi-card clickable" onclick="abrirModalColaboradoresGestor({{ dados_extras.setor_id_gestor }}, '{{ dados_extras.setor_nome_gestor }}')">
+                    <h3>Atividades Hoje (Setor)</h3>
+                    <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
+                    <i class="fas fa-calendar-day kpi-icon"></i>
+                </div>
                 <div class="kpi-card">
                     <h3>Colaboradores no Setor</h3>
                     <p class="kpi-number">{{ kpis.get('total_colaboradores_setor', 0) }}</p>
@@ -169,13 +167,11 @@
                 <p class="kpi-number">{{ kpis.get('total_atividades_setor', 0) }}</p>
                 <i class="fas fa-tasks kpi-icon"></i>
             </div>
-            <a href="{{ url_for('historico', setor_filtro=dados_extras.setor_id_gestor, filtro_data='hoje') }}" class="kpi-link">
-                <div class="kpi-card">
-                    <h3>Atividades Hoje (Setor)</h3>
-                    <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
-                    <i class="fas fa-calendar-day kpi-icon"></i>
-                </div>
-            </a>
+            <div class="kpi-card clickable" onclick="abrirModalColaboradoresGestor({{ dados_extras.setor_id_gestor }}, '{{ dados_extras.setor_nome_gestor }}')">
+                <h3>Atividades Hoje (Setor)</h3>
+                <p class="kpi-number">{{ kpis.get('atividades_hoje_setor', 0) }}</p>
+                <i class="fas fa-calendar-day kpi-icon"></i>
+            </div>
             <div class="kpi-card">
                 <h3>Colaboradores no Setor</h3>
                 <p class="kpi-number">{{ kpis.get('total_colaboradores_setor', 0) }}</p>
