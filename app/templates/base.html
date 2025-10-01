@@ -37,22 +37,23 @@
 
             {% if medalha_setor is not none and medalha_geral is not none %}
             <div class="sidebar-medals">
-                <span class="medal-item" title="Posição no Setor (Mês)">
-                    {% if medalha_setor == 1 %}<i class="fas fa-medal gold"></i>
-                    {% elif medalha_setor == 2 %}<i class="fas fa-medal silver"></i>
-                    {% elif medalha_setor == 3 %}<i class="fas fa-medal bronze"></i>
-                    {% else %}<i class="fas fa-award"></i>
-                    {% endif %}
-                    Setor: <b>{{ medalha_setor }}º</b>
-                </span>
-                <span class="medal-item" title="Posição Geral (Mês)">
-                    {% if medalha_geral == 1 %}<i class="fas fa-medal gold"></i>
-                    {% elif medalha_geral == 2 %}<i class="fas fa-medal silver"></i>
-                    {% elif medalha_geral == 3 %}<i class="fas fa-medal bronze"></i>
-                    {% else %}<i class="fas fa-trophy"></i>
-                    {% endif %}
-                    Geral: <b>{{ medalha_geral }}º</b>
-                </span>
+                <!-- sistemas de medalhas será desativado >-->
+<!--                <span class="medal-item" title="Posição no Setor (Mês)">-->
+<!--                    {% if medalha_setor == 1 %}<i class="fas fa-medal gold"></i>-->
+<!--                    {% elif medalha_setor == 2 %}<i class="fas fa-medal silver"></i>-->
+<!--                    {% elif medalha_setor == 3 %}<i class="fas fa-medal bronze"></i>-->
+<!--                    {% else %}<i class="fas fa-award"></i>-->
+<!--                    {% endif %}-->
+<!--                    Setor: <b>{{ medalha_setor }}º</b>-->
+<!--                </span>-->
+<!--                <span class="medal-item" title="Posição Geral (Mês)">-->
+<!--                    {% if medalha_geral == 1 %}<i class="fas fa-medal gold"></i>-->
+<!--                    {% elif medalha_geral == 2 %}<i class="fas fa-medal silver"></i>-->
+<!--                    {% elif medalha_geral == 3 %}<i class="fas fa-medal bronze"></i>-->
+<!--                    {% else %}<i class="fas fa-trophy"></i>-->
+<!--                    {% endif %}-->
+<!--                    Geral: <b>{{ medalha_geral }}º</b>-->
+<!--                </span>-->
             </div>
             {% endif %}
             <ul class="sidebar-menu">
