@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestão de Origens de Contato{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-sign-in-alt"></i>
+        Gestão de Origens de Contato
+    </h1>
+</div>
+
+<div class="admin-gestao-layout">
+
+    <!-- ====================== CARD 1 - CRIAR ORIGEM ====================== -->
+    <div class="info-card">
+        <h3><i class="fas fa-plus-circle"></i> Adicionar Nova Origem</h3>
+
+        <form class="form-minimal" method="POST" action="{{ url_for('admin_gestao_origens') }}">
+            <input type="hidden" name="acao" value="criar">
+
+            <div class="form-group">
+                <label for="nome_origem">Nome da Nova Origem</label>
+                <input type="text" id="nome_origem" name="nome_origem" placeholder="Ex: WhatsApp" required>
+            </div>
+
+            <div class="form-row" style="justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Criar Origem
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ====================== CARD 2 - LISTA DE ORIGENS ====================== -->
+    <div class="info-card">
+        <h3><i class="fas fa-list-ul"></i> Origens Atuais</h3>
+
+        <div class="table-container-simple">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome da Origem</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if origens %}
+                        {% for origem in origens %}
+                        <tr>
+                            <td>#{{ origem.id }}</td>
+                            <td data-label="Nome">{{ origem.nome }}</td>
+                            <td class="acoes-coluna">
+                                <!-- Botão Editar -->
+                                <button class="btn btn-action btn-warning"
+                                        title="Editar Origem"
+                                        onclick="abrirModalEditar('{{ origem.id }}', '{{ origem.nome }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+
+                                <!-- Botão Excluir -->
+                                <form method="POST"
+                                      action="{{ url_for('admin_gestao_origens') }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Deseja realmente excluir esta origem?');">
+                                    <input type="hidden" name="acao" value="excluir">
+                                    <input type="hidden" name="origem_id" value="{{ origem.id }}">
+                                    <button type="submit" class="btn btn-action btn-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3" style="text-align:center;">Nenhuma origem cadastrada.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal de Edição -->
+<div id="modal-editar" class="modal-overlay hidden">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3 id="modal-titulo">Editar Origem</h3>
+            <button type="button" class="modal-close-btn" onclick="fecharModalEditar()">&times;</button>
+        </div>
+
+        <form id="form-editar" method="POST" action="{{ url_for('admin_gestao_origens') }}">
+            <input type="hidden" name="acao" value="editar">
+            <input type="hidden" id="edit-origem-id" name="origem_id">
+
+            <div class="form-group">
+                <label for="edit-nome-origem">Nome da Origem</label>
+                <input type="text" id="edit-nome-origem" name="nome_origem" required>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="fecharModalEditar()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

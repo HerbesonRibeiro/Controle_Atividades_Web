@@ -1,0 +1,223 @@
+/**
+ * estilo_pds.css — Estilo refinado para modais, toasts e telas PDS
+ * Autor: Herbeson Ribeiro
+ * Data: 2025
+ */
+
+/* ===========================================================
+   TOASTS (mensagens flutuantes)
+   =========================================================== */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    background-color: #fff;
+    color: #333;
+    border-radius: 10px;
+    padding: 12px 18px;
+    min-width: 260px;
+    max-width: 340px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    opacity: 0.95;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast-success { border-left: 5px solid #2ecc71; }
+.toast-error { border-left: 5px solid #e74c3c; }
+.toast-info { border-left: 5px solid #3498db; }
+.toast-warning { border-left: 5px solid #f1c40f; }
+
+.toast-close-btn {
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: #555;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.toast-close-btn:hover {
+    color: #000;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.fade-out {
+    animation: fadeOut 0.4s forwards;
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-20px); }
+}
+
+/* ===========================================================
+   MODAIS
+   =========================================================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.55);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 5000;
+    transition: opacity 0.3s ease;
+}
+
+.modal-overlay.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    font-family: 'Poppins', sans-serif;
+    animation: zoomIn 0.3s ease-out;
+}
+
+@keyframes zoomIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.modal-header h3 {
+    font-weight: 600;
+    color: #333;
+    font-size: 18px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #888;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.modal-close:hover {
+    color: #000;
+}
+
+.modal-body {
+    color: #555;
+    line-height: 1.5;
+}
+
+/* ===========================================================
+   BOTÕES PADRÃO
+   =========================================================== */
+button,
+.btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background-color: #e74c3c;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn-copy {
+    background-color: #27ae60;
+    color: white;
+    font-size: 13px;
+    padding: 8px 12px;
+}
+
+.btn-copy:hover {
+    background-color: #219150;
+}
+
+/* ===========================================================
+   TELA "OBRIGADO" (layout refinado)
+   =========================================================== */
+.thankyou-container {
+    text-align: center;
+    margin-top: 80px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.thankyou-icon {
+    font-size: 64px;
+    color: #2ecc71;
+    margin-bottom: 20px;
+}
+
+.thankyou-message {
+    font-size: 22px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 12px;
+}
+
+.thankyou-subtext {
+    font-size: 15px;
+    color: #666;
+    margin-bottom: 32px;
+}
+
+.thankyou-btn {
+    background-color: #3498db;
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.thankyou-btn:hover {
+    background-color: #2980b9;
+    transform: translateY(-2px);
+}

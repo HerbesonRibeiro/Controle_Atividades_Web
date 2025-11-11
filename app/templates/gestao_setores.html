@@ -6,19 +6,20 @@
 <div class="content-container">
 
     <div class="page-header">
-        <h1 class="page-title"><i class="fas fa-building"></i> Gestão de Setores</h1>
-        <button class="btn-primary" onclick="abrirModal()">
+        <h1 class="page-title" style="margin-bottom: 0;"><i class="fas fa-building"></i> Gestão de Setores</h1>
+        <button class="btn btn-primary" onclick="abrirModal('modal-novo-setor')">
             <i class="fas fa-plus"></i> Novo Setor
         </button>
     </div>
 
     <div class="info-card">
-        <div class="table-container">
-            <table class="gestao-table">
+        <div class="table-container" style="margin-bottom: 0; border: none; max-height: none;">
+
+            <table class="styled-table">
                 <thead>
                     <tr>
-                        <th>Nome do Setor</th>
-                        <th>Gestor Responsável</th>
+                        <th style="width: 50%;">Nome do Setor</th>
+                        <th style="width: 35%;">Gestor Responsável</th>
                         <th style="width: 15%; text-align: center;">Ações</th>
                     </tr>
                 </thead>
@@ -46,49 +47,39 @@
         </div>
     </div>
 
-</div>
+</div> <div id="modal-novo-setor" class="modal-overlay hidden">
+    <div class="modal-container" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2 id="modal-title"><i class="fas fa-plus-circle"></i> Novo Setor</h2>
+            <button class="modal-close-btn" onclick="fecharModal('modal-novo-setor')">&times;</button>
+        </div>
 
-<div id="modal-novo-setor" class="modal-overlay hidden">
-    <div class="modal-content" style="max-width: 500px;">
-        <button class="modal-close" onclick="fecharModal()">&times;</button>
-        <h2><i class="fas fa-plus-circle"></i> Novo Setor</h2>
-        <form method="POST" action="{{ url_for('gestao_setores') }}">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="nome_setor">Nome do Setor</label>
-                    <input type="text" id="nome_setor" name="nome_setor" required>
+        <div class="modal-body">
+            <form method="POST" action="{{ url_for('gestao_setores') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nome_setor">Nome do Setor</label>
+                        <input type="text" id="nome_setor" name="nome_setor" required>
+                    </div>
                 </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="gestor_id">Gestor do Setor (opcional)</label>
-                    <select id="gestor_id" name="gestor_id">
-                        <option value="">Nenhum</option>
-                        {% for colaborador in colaboradores %}
-                        <option value="{{ colaborador.id }}">{{ colaborador.nome }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gestor_id">Gestor do Setor (opcional)</label>
+                        <select id="gestor_id" name="gestor_id">
+                            <option value="">Nenhum</option>
+                            {% for colaborador in colaboradores %}
+                            <option value="{{ colaborador.id }}">{{ colaborador.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="form-row form-buttons">
-                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
-                <button type="submit" class="btn-primary">Salvar</button>
-            </div>
-        </form>
+                <div class="form-row" style="justify-content: flex-end; margin-top: 20px; margin-bottom: 0;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModal('modal-novo-setor')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
-<script>
-function abrirModal() {
-    document.getElementById('modal-novo-setor').classList.remove('hidden');
-}
-function fecharModal() {
-    document.getElementById('modal-novo-setor').classList.add('hidden');
-}
-document.getElementById('modal-novo-setor').addEventListener('click', function(e) {
-    if (e.target === this) {
-        fecharModal();
-    }
-});
-</script>
 {% endblock %}

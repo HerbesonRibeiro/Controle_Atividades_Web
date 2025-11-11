@@ -7,7 +7,7 @@
 
     <div class="page-header">
         <h1 class="page-title"><i class="fas fa-user-edit"></i> Editar Usuário</h1>
-        <a href="{{ url_for('gestao_usuarios') }}" class="btn-secondary">
+        <a href="{{ url_for('gestao_usuarios') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Voltar
         </a>
     </div>
@@ -85,9 +85,9 @@
                 </div>
             </div>
 
-            <div class="form-row form-buttons">
-                <a href="{{ url_for('gestao_usuarios') }}" class="btn-secondary">Cancelar</a>
-                <button type="submit" class="btn-primary">Salvar Alterações</button>
+            <div class="form-row" style="justify-content: flex-end; margin-top: 20px; margin-bottom: 0;">
+                <a href="{{ url_for('gestao_usuarios') }}" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">Salvar Alterações</button>
             </div>
         </form>
     </div>

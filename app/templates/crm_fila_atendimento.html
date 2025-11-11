@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}Fila de Atendimento{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-tasks"></i>
+        Fila de Atendimento
+    </h1>
+
+    <a href="{{ url_for('crm_iniciar_atendimento') }}" class="btn btn-primary">
+        <i class="fas fa-plus-circle"></i>
+        Novo Atendimento
+    </a>
+</div>
+
+<div class="info-card">
+    <form class="filter-bar" method="GET" action="{{ url_for('crm_fila_atendimento') }}">
+
+        <div class="form-row">
+
+            <div class="form-group" style="flex: 1;">
+                <label for="filtro_status">Ver Fila</label>
+                <select id="filtro_status" name="filtro_status">
+                    {% set filtro_status_req = filtros_aplicados.get('filtro_status') %}
+                    <option value="fila" {% if filtro_status_req == 'fila' or not filtro_status_req %}selected{% endif %}>
+                        Fila de Trabalho (Ativos)
+                    </option>
+                    <option value="finalizados" {% if filtro_status_req == 'finalizados' %}selected{% endif %}>
+                        Finalizados
+                    </option>
+                    <option value="todos" {% if filtro_status_req == 'todos' %}selected{% endif %}>
+                        Ver Todos
+                    </option>
+                </select>
+            </div>
+
+            <div class="form-group" style="flex: 2;">
+                <label for="filtro_titulo">Título / Assunto</label>
+                <input type="text" id="filtro_titulo" name="filtro_titulo" value="{{ filtros_aplicados.get('filtro_titulo', '') }}" placeholder="Buscar por título...">
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+                <label for="tipo_filtro">Tipo de Atendimento</label>
+                <select id="tipo_filtro" name="tipo_filtro">
+                    <option value="">Todos os Tipos</option>
+                    {% for tipo in tipos_atendimento %}
+                        <option value="{{ tipo.id }}" {% if filtros_aplicados.get('tipo_filtro') == tipo.id | string %}selected{% endif %}>
+                            {{ tipo.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+        </div>
+
+        <div class="form-row">
+
+            <div class="form-group" style="flex: 1;">
+                <label for="colaborador_filtro">Responsável</label>
+                <select id="colaborador_filtro" name="colaborador_filtro">
+                    <option value="">Todos os Responsáveis</option>
+                    {% for c in lista_colaboradores %}
+                        <option value="{{ c.id }}" {% if filtros_aplicados.get('colaborador_filtro') == c.id | string %}selected{% endif %}>
+                            {{ c.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+                <label for="setor_filtro">Setor Responsável</label>
+                <select id="setor_filtro" name="setor_filtro">
+                    <option value="">Todos os Setores</option>
+                    {% for s in lista_setores %}
+                        <option value="{{ s.id }}" {% if filtros_aplicados.get('setor_filtro') == s.id | string %}selected{% endif %}>
+                            {{ s.nome_setor }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+                <label for="data_ini">Criado de:</label>
+                <input type="date" id="data_ini" name="data_ini" value="{{ filtros_aplicados.get('data_ini', '') }}">
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+                <label for="data_fim">Até:</label>
+                <input type="date" id="data_fim" name="data_fim" value="{{ filtros_aplicados.get('data_fim', '') }}">
+            </div>
+
+        </div>
+
+        <div class="form-row" style="justify-content: flex-end;">
+            <a href="{{ url_for('crm_fila_atendimento') }}" class="btn btn-secondary">Limpar Filtros</a>
+            <button type="submit" class="btn btn-primary" style="margin-left: 10px;">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="info-card table-container">
+    <table class="table-uppercase">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Título / Assunto</th>
+                <th>Cliente</th>
+                <th>Responsável</th>
+                <th>Setor</th>
+                <th>Iniciado Em</th> <th>Última Atualização</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if lista_atendimentos %}
+                {% for atendimento in lista_atendimentos %}
+                    <tr>
+                        <td>#{{ atendimento.id }}</td>
+                        <td>
+                            <span class="status-badge status-{{ atendimento.status_fila | lower | replace(' ', '-') }}">
+                                {{ atendimento.status_fila }}
+                            </span>
+                        </td>
+                        <td data-label="Título">{{ atendimento.titulo }}</td>
+                        <td data-label="Cliente">{{ atendimento.cliente_nome }}</td>
+                        <td data-label="Responsável">{{ atendimento.responsavel_nome }}</td>
+                        <td data-label="Setor">{{ atendimento.nome_setor }}</td>
+
+                        <td data-label="Iniciado em">
+                            {{ atendimento.criado_em.strftime('%d/%m/%Y %H:%M') }}
+                        </td>
+
+                        <td data-label="Atualizado em">
+                            {{ atendimento.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') }}
+                        </td>
+                        <td data-label="Ações">
+                            <a href="{{ url_for('crm_detalhe_atendimento', atendimento_id=atendimento.id) }}" class="btn btn-action btn-primary" title="Ver / Atender">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 30px;">
+                        Nenhum atendimento encontrado para os filtros aplicados.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+    <div class="pagination">
+        <a href="{{ url_for('crm_fila_atendimento', page=1, **filtros_aplicados) }}"
+           class="page-link {{ 'disabled' if current_page == 1 else '' }}"
+           title="Primeira Página">&laquo;</a>
+
+        <a href="{{ url_for('crm_fila_atendimento', page=current_page - 1, **filtros_aplicados) }}"
+           class="page-link {{ 'disabled' if current_page == 1 else '' }}"
+           title="Página Anterior">&lsaquo;</a>
+
+        {% set start = [current_page - 2, 1] | max %}
+        {% set end = [current_page + 2, total_pages] | min %}
+
+        {% if start > 1 %}
+            <span class="page-link disabled">...</span>
+        {% endif %}
+
+        {% for p in range(start, end + 1) %}
+            <a href="{{ url_for('crm_fila_atendimento', page=p, **filtros_aplicados) }}"
+               class="page-link {{ 'active' if p == current_page else '' }}">
+                {{ p }}
+            </a>
+        {% endfor %}
+
+        {% if end < total_pages %}
+            <span class="page-link disabled">...</span>
+        {% endif %}
+
+        <a href="{{ url_for('crm_fila_atendimento', page=current_page + 1, **filtros_aplicados) }}"
+           class="page-link {{ 'disabled' if current_page == total_pages else '' }}"
+           title="Próxima Página">&rsaquo;</a>
+
+        <a href="{{ url_for('crm_fila_atendimento', page=total_pages, **filtros_aplicados) }}"
+           class="page-link {{ 'disabled' if current_page == total_pages else '' }}"
+           title="Última Página">&raquo;</a>
+    </div>
+{% endif %}
+{% endblock %}

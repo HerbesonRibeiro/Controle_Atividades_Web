@@ -6,23 +6,26 @@
 <div class="content-container">
 
     <div class="page-header">
-        <h1 class="page-title"><i class="fas fa-tasks"></i> Gestão de Tipos de Atividades</h1>
-        <button class="btn-primary" onclick="abrirModal()">
+        <h1 class="page-title" style="margin-bottom: 0;"><i class="fas fa-tasks"></i> Gestão de Tipos de Atividades</h1>
+
+        <button class="btn btn-primary" onclick="abrirModal('modal-novo-tipo')">
             <i class="fas fa-plus"></i> Novo Tipo
         </button>
     </div>
 
     <div class="info-card">
         <form method="GET" action="{{ url_for('gestao_tipos_atividades') }}">
+            <h3 style="margin-top: 0; margin-bottom: 20px;">
+                <i class="fas fa-filter"></i> Filtros
+            </h3>
             <div class="form-row">
-                <div class="form-group" style="flex-grow: 2;">
-                    <label for="filtro_nome">Buscar por Nome:</label>
+                <div class="form-group" style="flex-grow: 2;"> <label for="filtro_nome">Buscar por Nome:</label>
                     <input type="text" name="q" id="filtro_nome" value="{{ request.args.get('q', '') }}" placeholder="Digite parte do nome...">
                 </div>
-                <div class="form-group" style="align-self: flex-end;">
-                     <div class="filter-buttons">
-                        <a href="{{ url_for('gestao_tipos_atividades') }}" class="btn-secondary">Limpar</a>
-                        <button type="submit" class="btn-primary">Buscar</button>
+                <div class="form-group" style="align-self: flex-end; justify-content: flex-end; flex-grow: 1;">
+                     <div style="display: flex; gap: 10px;">
+                        <a href="{{ url_for('gestao_tipos_atividades') }}" class="btn btn-secondary">Limpar</a>
+                        <button type="submit" class="btn btn-primary">Buscar</button>
                     </div>
                 </div>
             </div>
@@ -30,8 +33,9 @@
     </div>
 
     <div class="info-card">
-        <div class="table-container">
-            <table class="gestao-table">
+        <div class="table-container" style="margin-bottom: 0; border: none; max-height: none;">
+
+            <table class="styled-table">
                 <thead>
                     <tr>
                         <th>Nome da Atividade</th>
@@ -61,38 +65,28 @@
         </div>
     </div>
 
-</div>
+</div> <div id="modal-novo-tipo" class="modal-overlay hidden">
+    <div class="modal-container" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2 id="modal-title"><i class="fas fa-plus-circle"></i> Novo Tipo de Atividade</h2>
+            <button class="modal-close-btn" onclick="fecharModal('modal-novo-tipo')">&times;</button>
+        </div>
 
-<div id="modal-novo-tipo" class="modal-overlay hidden">
-    <div class="modal-content" style="max-width: 500px;">
-        <button class="modal-close" onclick="fecharModal()">&times;</button>
-        <h2><i class="fas fa-plus-circle"></i> Novo Tipo de Atividade</h2>
-        <form method="POST" action="{{ url_for('gestao_tipos_atividades') }}">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="nome_atividade">Nome do Tipo de Atividade</label>
-                    <input type="text" id="nome_atividade" name="nome_atividade" required>
+        <div class="modal-body">
+            <form method="POST" action="{{ url_for('gestao_tipos_atividades') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nome_atividade">Nome do Tipo de Atividade</label>
+                        <input type="text" id="nome_atividade" name="nome_atividade" required>
+                    </div>
                 </div>
-            </div>
-            <div class="form-row form-buttons">
-                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
-                <button type="submit" class="btn-primary">Salvar</button>
-            </div>
-        </form>
+                <div class="form-row" style="justify-content: flex-end; margin-top: 20px; margin-bottom: 0;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModal('modal-novo-tipo')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
-<script>
-function abrirModal() {
-    document.getElementById('modal-novo-tipo').classList.remove('hidden');
-}
-function fecharModal() {
-    document.getElementById('modal-novo-tipo').classList.add('hidden');
-}
-document.getElementById('modal-novo-tipo').addEventListener('click', function(e) {
-    if (e.target === this) {
-        fecharModal();
-    }
-});
-</script>
 {% endblock %}

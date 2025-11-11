@@ -6,14 +6,21 @@
 <div class="content-container">
 
     <div class="page-header">
-        <h1 class="page-title"><i class="fas fa-users-cog"></i> Gestão de Usuários</h1>
-        <button class="btn-primary" onclick="abrirModalUsuario()">
+        <h1 class="page-title" style="margin-bottom: 0;">
+            <i class="fas fa-users-cog"></i> Gestão de Usuários
+        </h1>
+
+        <button class="btn btn-primary" onclick="abrirModal('modal-usuario')">
             <i class="fas fa-plus"></i> Novo Usuário
         </button>
     </div>
 
     <div class="info-card">
         <form method="GET" action="{{ url_for('gestao_usuarios') }}">
+            <h3 style="margin-top: 0; margin-bottom: 20px;">
+                <i class="fas fa-filter"></i> Filtros
+            </h3>
+
             <div class="form-row">
                 <div class="form-group">
                     <label for="setor_filtro">Filtrar por Setor:</label>
@@ -38,23 +45,25 @@
                     </select>
                 </div>
             </div>
-            <div class="form-row form-buttons">
-                 <a href="{{ url_for('gestao_usuarios') }}" class="btn-secondary">Limpar Filtros</a>
+
+            <div class="form-row" style="justify-content: flex-end; margin-bottom: 0;">
+                 <a href="{{ url_for('gestao_usuarios') }}" class="btn btn-secondary">Limpar Filtros</a>
             </div>
         </form>
     </div>
 
     <div class="info-card">
-        <div class="table-container">
-            <table class="gestao-table">
+        <div class="table-container" style="margin-bottom: 0; border: none; max-height: none;">
+
+            <table class="styled-table">
                 <thead>
                     <tr>
-                        <th>Nome</th>
-                        <th>Usuário</th>
-                        <th>Setor</th>
-                        <th>Perfil</th>
-                        <th>Status</th>
-                        <th>Ações</th>
+                        <th style="width: 25%;">Nome</th>
+                        <th style="width: 15%;">Usuário</th>
+                        <th style="width: 25%;">Setor</th>
+                        <th style="width: 15%;">Perfil</th>
+                        <th style="width: 10%; text-align: center;">Status</th>
+                        <th style="width: 10%; text-align: center;">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -94,109 +103,81 @@
         </div>
     </div>
 
-</div>
+</div> <div id="modal-usuario" class="modal-overlay hidden">
+    <div class="modal-container"> <div class="modal-header">
+            <h2 id="modal-title"><i class="fas fa-user-plus"></i> Novo Usuário</h2>
+            <button class="modal-close-btn" onclick="fecharModal('modal-usuario')">&times;</button>
+        </div>
 
-<div id="modal-usuario" class="modal-overlay hidden">
-    <div class="modal-content">
-        <button class="modal-close" onclick="fecharModalUsuario()">&times;</button>
-        <h2><i class="fas fa-user-plus"></i> Novo Usuário</h2>
-
-        <form method="POST" action="{{ url_for('novo_usuario') }}">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="nome">Nome Completo</label>
-                    <input type="text" id="nome" name="nome" required>
+        <div class="modal-body">
+            <form method="POST" action="{{ url_for('novo_usuario') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nome">Nome Completo</label>
+                        <input type="text" id="nome" name="nome" required>
+                    </div>
                 </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="usuario">Usuário</label>
+                        <input type="text" id="usuario" name="usuario" required>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="usuario">Usuário</label>
-                    <input type="text" id="usuario" name="usuario" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="setor">Setor</label>
+                        <select id="setor" name="setor" required>
+                            <option value="">Selecione o setor...</option>
+                            {% for setor in setores %}
+                            <option value="{{ setor.id }}">{{ setor.nome_setor }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="perfil">Perfil</label>
+                        <select id="perfil" name="perfil" required>
+                            <option value="">Selecione o perfil...</option>
+                            {% for perfil in perfis %}
+                            <option value="{{ perfil.id }}">{{ perfil.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="setor">Setor</label>
-                    <select id="setor" name="setor" required>
-                        <option value="">Selecione o setor...</option>
-                        {% for setor in setores %}
-                        <option value="{{ setor.id }}">{{ setor.nome_setor }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="cargo">Cargo</label>
+                        <select id="cargo" name="cargo" required>
+                            <option value="">Selecione o cargo...</option>
+                            {% for cargo in cargos %}
+                            <option value="{{ cargo.cargo }}">{{ cargo.cargo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select id="status" name="status" required>
+                            <option value="Ativo">Ativo</option>
+                            <option value="Inativo">Inativo</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="perfil">Perfil</label>
-                    <select id="perfil" name="perfil" required>
-                        <option value="">Selecione o perfil...</option>
-                        {% for perfil in perfis %}
-                        <option value="{{ perfil.id }}">{{ perfil.nome }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="senha">Senha Inicial</label>
+                        <input type="password" id="senha" name="senha" required minlength="6">
+                    </div>
                 </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="cargo">Cargo</label>
-                    <select id="cargo" name="cargo" required>
-                        <option value="">Selecione o cargo...</option>
-                        {% for cargo in cargos %}
-                        <option value="{{ cargo.cargo }}">{{ cargo.cargo }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="form-row" style="justify-content: flex-end; margin-top: 20px; margin-bottom: 0;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModal('modal-usuario')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar Usuário</button>
                 </div>
-                <div class="form-group">
-                    <label for="status">Status</label>
-                    <select id="status" name="status" required>
-                        <option value="Ativo">Ativo</option>
-                        <option value="Inativo">Inativo</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="senha">Senha Inicial</label>
-                    <input type="password" id="senha" name="senha" required minlength="6">
-                </div>
-            </div>
-            <div class="form-row form-buttons">
-                <button type="button" class="btn-secondary" onclick="fecharModalUsuario()">Cancelar</button>
-                <button type="submit" class="btn-primary">Criar Usuário</button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
-<script>
-    // Função para abrir o modal de novo usuário
-    function abrirModalUsuario() {
-        document.getElementById('modal-usuario').classList.remove('hidden');
-    }
-
-    // Função para fechar o modal
-    function fecharModalUsuario() {
-        document.getElementById('modal-usuario').classList.add('hidden');
-    }
-
-    // Bônus: Fechar o modal se o usuário clicar no fundo escuro (fora da janela branca)
-    document.getElementById('modal-usuario').addEventListener('click', function(event) {
-        // Verifica se o clique foi no próprio overlay (o fundo)
-        if (event.target === this) {
-            fecharModalUsuario();
-        }
-    });
-
-    // Bônus 2: Permite fechar o modal pressionando a tecla 'Esc'
-    document.addEventListener('keydown', function(event) {
-        if (event.key === "Escape") {
-            // Verifica se o modal não está escondido antes de tentar fechar
-            if (!document.getElementById('modal-usuario').classList.contains('hidden')) {
-                fecharModalUsuario();
-            }
-        }
-    });
-</script>
 {% endblock %}

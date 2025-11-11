@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalhe do Atendimento #{{ atendimento.id }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-ticket-alt"></i>
+        Atendimento #{{ atendimento.id }}: {{ atendimento.titulo }}
+    </h1>
+
+    <a href="{{ url_for('crm_fila_atendimento') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i>
+        Voltar
+    </a>
+</div>
+
+<div class="detalhe-layout">
+
+    <div class="main-column">
+
+        <div class="info-card">
+
+            {% set is_owner = (atendimento.responsavel_id == session.colaborador_id) %}
+            {% set is_active = (atendimento.status_fila in ['Em atendimento', 'Aguardando']) %}
+            {% set is_unassigned = (atendimento.status_fila in ['Triagem', 'Em fila']) %}
+
+            {% if (is_active and is_owner) or (atendimento.status_fila in ['Resolvido', 'Fechado', 'Cancelado']) %}
+
+                <h3>
+                    <i class="fas fa-edit"></i>
+                    Adicionar ao Histórico
+                </h3>
+
+                <form id="acao-form" method="POST" action="{{ url_for('crm_detalhe_atendimento', atendimento_id=atendimento.id) }}">
+
+                    <div class="form-group">
+                        <label for="descricao">Adicionar um comentário ou resolução:</label>
+                        <textarea id="descricao" name="descricao" rows="5" placeholder="Digite seu comentário..." required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="novo_status_interno">Definir Status Interno como:</label>
+                        <select id="novo_status_interno" name="novo_status_interno" class="form-control-sm">
+                            {% set status_interno_lista = [
+                                'Em atendimento',
+                                'Pendente (Aguardando outro setor)',
+                                'Pendente (aguardando retorno do solicitante)',
+                                'Solucionado provisoriamente',
+                                'Escalado para Gestão'
+                            ] %}
+                            {% for status in status_interno_lista %}
+                                <option value="{{ status }}" {% if atendimento.status_interno == status %}selected{% endif %}>
+                                    {{ status }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group-checkbox" style="margin-top: 10px;">
+                        <input type="checkbox" id="gerar_pds" name="gerar_pds" value="1" checked>
+                        <label for="gerar_pds">Gerar Pesquisa de Satisfação (PDS) neste encerramento</label>
+                    </div>
+
+                    <div class="form-row" style="justify-content: space-between; align-items: center; margin-top: 15px;">
+                        <div class="botoes-acao">
+                            <button type="submit" name="acao" value="comentario" class="btn btn-primary btn-sm">
+                                <i class="fas fa-comment"></i> Adicionar Comentário
+                            </button>
+
+                            <button type="submit" name="acao" value="resolver" class="btn btn-success btn-sm">
+                                <i class="fas fa-check-circle"></i> Comentar e Resolver
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+            {% else %}
+
+                <h3>
+                    <i class="fas fa-edit"></i>
+                    Ação Rápida
+                </h3>
+                <p style="font-size: 14px; color: var(--dark-gray); margin-bottom: 20px;">
+                    Este atendimento está na fila (<b>{{ atendimento.status_fila }}</b>) e o responsável atual é <b>{{ atendimento.responsavel_nome }}</b>.
+                </p>
+
+                <form method="POST" action="{{ url_for('crm_detalhe_atendimento', atendimento_id=atendimento.id) }}">
+                    <input type="hidden" name="acao" value="assumir">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-user-check"></i>
+                        Assumir Atendimento
+                    </button>
+                </form>
+
+            {% endif %}
+
+        </div> <div class="info-card">
+            <h3>
+                <i class="fas fa-history"></i>
+                Linha do Tempo
+            </h3>
+            <div class="timeline">
+                {% if historico %}
+                    {% for item in historico %}
+                        <div class="timeline-item">
+                            <div class="timeline-icon">
+                                {% if item.tipo_acao == 'Criacao' %}
+                                    <i class="fas fa-plus"></i>
+                                {% else %}
+                                    <i class="fas fa-comment"></i>
+                                {% endif %}
+                            </div>
+                            <div class="timeline-content">
+                                <span class="timeline-author">{{ item.colaborador_nome }}</span>
+                                <span class="timeline-timestamp">
+                                    {{ item.timestamp.strftime('%d/%m/%Y às %H:%M') }}
+                                </span>
+
+                                {% if item.tipo_acao == 'Comentario' and not item.descricao.startswith('[') %}
+                                    <span class="timeline-tipo-acao">({{ item.tipo_acao }})</span>
+                                {% endif %}
+
+                                <div class="timeline-descricao">
+                                    {{ item.descricao | safe }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>Nenhum histórico encontrado para este atendimento.</p>
+                {% endif %}
+            </div>
+        </div> </div> <div class="sidebar-column">
+
+        <div class="info-card">
+            <h3 class="info-card-header">
+                <i class="fas fa-shield-alt"></i>
+                Status & Ações
+            </h3>
+
+            <div class="detalhe-item">
+                <span>Status (Workflow):</span>
+                <span class="status-badge status-{{ atendimento.status_fila | lower | replace(' ', '-') }}">
+                    {{ atendimento.status_fila }}
+                </span>
+            </div>
+
+            {% if pds_info %}
+                <div class="detalhe-item" style="flex-direction: column; align-items: flex-start; margin-top: 15px;">
+                    <span>Link da Pesquisa (PDS):</span>
+
+                    {% if pds_info.status == 'Respondida' %}
+                        <div style="display: flex; align-items: center; gap: 6px; margin-top: 5px;">
+                            <span class="status-badge status-success">
+                                <i class="fas fa-check-circle"></i> Respondida
+                            </span>
+                            <button class="btn btn-secondary btn-sm"
+                                type="button"
+                                onclick="abrirModalPDS('{{ pds_info.q1_demanda }}', '{{ pds_info.q2_nota_atendimento }}', '{{ pds_info.q3_nota_recomendacao }}', event)"
+                                title="Ver Respostas da Pesquisa">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        </div>
+                    {% else %}
+
+                        <div class="form-row" style="width: 100%; margin-top: 5px;">
+                            <input type="text"
+                                   id="pds-link-url"
+                                   class="form-control-sm"
+                                   value="{{ url_for('pds_responder', token=pds_info.token, _external=True) }}"
+                                   readonly
+                                   style="flex-grow: 1; font-size: 12px;">
+
+                            <button class="btn btn-secondary btn-sm"
+                                    id="btn-copiar-pds"
+                                    type="button"
+                                    onclick="copiarLinkPDS()"
+                                    title="Copiar Link">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <div class="detalhe-item">
+                <span>Status (Interno):</span>
+                <strong>{{ atendimento.status_interno }}</strong>
+            </div>
+
+            <hr>
+
+            <form method="POST" action="{{ url_for('crm_detalhe_atendimento', atendimento_id=atendimento.id) }}">
+                <input type="hidden" name="acao" value="mudar_status">
+                <div class="form-group">
+                    <label for="novo_status">Mudar Status (Workflow) para:</label>
+                    <select id="novo_status" name="novo_status" class="form-control-sm">
+                        {% set status_lista = ['Triagem', 'Em fila', 'Em atendimento', 'Aguardando', 'Resolvido', 'Fechado', 'Cancelado'] %}
+                        {% for status in status_lista %}
+                            <option value="{{ status }}" {% if atendimento.status_fila == status %}disabled selected{% endif %}>
+                                {{ status }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 5px;">
+                        Mudar
+                    </button>
+                </div>
+            </form>
+
+            <hr>
+
+            <form method="POST" action="{{ url_for('crm_detalhe_atendimento', atendimento_id=atendimento.id) }}">
+                <input type="hidden" name="acao" value="encaminhar">
+                <div class="form-group">
+                    <label for="encaminhar_setor">Encaminhar para Setor:</label>
+                    <select id="encaminhar_setor" name="encaminhar_setor" class="form-control-sm" required>
+                        <option value="" disabled selected>Selecione o setor...</option>
+                        {% for setor in lista_setores %}
+                            {% if setor.id != atendimento.setor_responsavel_id %}
+                                <option value="{{ setor.id }}">{{ setor.nome_setor }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-warning btn-sm" style="margin-top: 5px;">
+                        Encaminhar
+                    </button>
+                </div>
+            </form>
+
+            <hr>
+
+            <form method="POST" action="{{ url_for('crm_detalhe_atendimento', atendimento_id=atendimento.id) }}">
+                <input type="hidden" name="acao" value="mudar_responsavel">
+                <div class="form-group">
+                    <label for="novo_responsavel">Mudar Responsável (no Setor):</label>
+
+                    {% if lista_colaboradores_setor %}
+                        <select id="novo_responsavel" name="novo_responsavel" class="form-control-sm" required>
+                            <option value="" disabled selected>Selecione um colega...</option>
+                            {% for colega in lista_colaboradores_setor %}
+                                {% if colega.id != atendimento.responsavel_id %}
+                                    <option value="{{ colega.id }}">{{ colega.nome }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 5px;">
+                            Reatribuir
+                        </button>
+                    {% else %}
+                        <p style="font-size: 12px; color: var(--dark-gray); margin-top: 5px;">
+                            Não há outros colegas ativos neste setor para reatribuir.
+                        </p>
+                    {% endif %}
+                </div>
+            </form>
+
+        </div> <div class="info-card">
+            <h3 class="info-card-header"><i class="fas fa-user"></i> Detalhes do Cliente</h3>
+            <div class="detalhe-item">
+                <span>Nome:</span>
+                <strong>{{ atendimento.cliente_nome }}</strong>
+            </div>
+            <div class="detalhe-item">
+                <span>Tipo:</span>
+                <span>{{ atendimento.cliente_tipo_nome }} ({{ atendimento.cliente_grupo_nome }})</span>
+            </div>
+            <div class="detalhe-item">
+                <span>ID (RA/Polo):</span>
+                <strong>{{ atendimento.cliente_identificador }}</strong>
+            </div>
+            <div class="detalhe-item">
+                <span>Telefone:</span>
+                <span>{{ atendimento.cliente_telefone | default('N/A') }}</span>
+            </div>
+            <div class="detalhe-item">
+                <span>E-mail:</span>
+                <span>{{ atendimento.cliente_email | default('N/A') }}</span>
+            </div>
+        </div> <div class="info-card">
+            <h3 class="info-card-header"><i class="fas fa-info-circle"></i> Detalhes do Atendimento</h3>
+            <div class="detalhe-item">
+                <span>Criador:</span>
+                <span>{{ atendimento.criador_nome }}</span>
+            </div>
+            <div class="detalhe-item">
+                <span>Responsável:</span>
+                <strong>{{ atendimento.responsavel_nome }}</strong>
+            </div>
+            <div class="detalhe-item">
+                <span>Setor Atual:</span>
+                <strong>{{ atendimento.setor_responsavel_nome }}</strong>
+            </div>
+            <div class="detalhe-item">
+                <span>Origem:</span>
+                <span>{{ atendimento.origem_nome }}</span>
+            </div>
+            <div class="detalhe-item">
+                <span>Tipo:</span>
+                <span>{{ atendimento.tipo_atendimento_nome }}</span>
+            </div>
+            <div class="detalhe-item">
+                <span>Nível:</span>
+                <span>{{ atendimento.nivel_complexidade | capitalize }}</span>
+            </div>
+            <div class="detalhe-item">
+                <span>Criado em:</span>
+                <span>{{ atendimento.criado_em.strftime('%d/%m/%Y %H:%M') }}</span>
+            </div>
+            <div class="detalhe-item">
+                <span>Atualizado em:</span>
+                <span>{{ atendimento.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') }}</span>
+            </div>
+        </div> </div> </div>
+        <!-- Modal para visualizar respostas da Pesquisa de Satisfação -->
+        <div id="modal-pds" class="modal-overlay hidden">
+            <div class="modal-container" style="max-width: 450px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-poll"></i> Pesquisa de Satisfação</h2>
+                    <button class="modal-close-btn" onclick="fecharModalPDS()">&times;</button>
+                </div>
+
+                <div class="modal-body" id="modal-pds-body">
+                    <!-- conteúdo será injetado pelo JS -->
+                </div>
+
+                <div class="modal-footer" style="text-align: right;">
+                    <button class="btn btn-secondary" onclick="fecharModalPDS()">Fechar</button>
+                </div>
+            </div>
+        </div>
+
+{% endblock %}

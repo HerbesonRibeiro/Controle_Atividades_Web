@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestão de Clientes e Grupos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-users-cog"></i>
+        Gestão de Grupos e Tipos de Cliente
+    </h1>
+</div>
+
+<div class="admin-gestao-layout">
+
+    <!-- ========================================= -->
+    <!-- BLOCO 1: GRUPOS -->
+    <!-- ========================================= -->
+    <div class="info-card">
+        <h3><i class="fas fa-layer-group"></i> 1. Grupos de Cliente</h3>
+
+        <form class="form-minimal" method="POST" action="{{ url_for('admin_gestao_clientes') }}">
+            <input type="hidden" name="acao" value="criar_grupo">
+            <div class="form-group">
+                <label for="nome_grupo">Nome do Novo Grupo</label>
+                <input type="text" id="nome_grupo" name="nome_grupo" placeholder="Ex: Estudantes" required>
+            </div>
+            <div class="form-row" style="justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus-circle"></i> Criar Grupo
+                </button>
+            </div>
+        </form>
+
+        <hr style="margin: 25px 0;">
+
+        <h4>Grupos Atuais</h4>
+        <div class="table-container-simple">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome do Grupo</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if grupos %}
+                        {% for grupo in grupos %}
+                        <tr>
+                            <td>#{{ grupo.id }}</td>
+                            <td>{{ grupo.nome }}</td>
+                            <td class="acoes-coluna">
+                                <button class="btn btn-action btn-warning"
+                                        title="Editar"
+                                        onclick="abrirModalEditarGrupo('{{ grupo.id }}', '{{ grupo.nome }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+
+                                <form method="POST" action="{{ url_for('admin_gestao_clientes') }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Deseja excluir este grupo?');">
+                                    <input type="hidden" name="acao" value="excluir_grupo">
+                                    <input type="hidden" name="grupo_id" value="{{ grupo.id }}">
+                                    <button type="submit" class="btn btn-action btn-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="3" style="text-align:center;">Nenhum grupo cadastrado.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- BLOCO 2: TIPOS DE CLIENTE -->
+    <!-- ========================================= -->
+    <div class="info-card">
+        <h3><i class="fas fa-user-tag"></i> 2. Tipos de Cliente (Vinculados)</h3>
+
+        <form class="form-minimal" method="POST" action="{{ url_for('admin_gestao_clientes') }}">
+            <input type="hidden" name="acao" value="criar_tipo">
+
+            <div class="form-group">
+                <label for="nome_tipo">Nome do Novo Tipo</label>
+                <input type="text" id="nome_tipo" name="nome_tipo" placeholder="Ex: Graduação EAD" required>
+            </div>
+
+            <div class="form-group">
+                <label for="grupo_id">Vincular ao Grupo:</label>
+                <select id="grupo_id" name="grupo_id" required>
+                    <option value="" disabled selected>Selecione um grupo...</option>
+                    {% for g in grupos %}
+                        <option value="{{ g.id }}">{{ g.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-row" style="justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus-circle"></i> Criar Tipo
+                </button>
+            </div>
+        </form>
+
+        <hr style="margin: 25px 0;">
+
+        <h4>Tipos Atuais</h4>
+        <div class="table-container-simple">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome do Tipo</th>
+                        <th>Grupo</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tipos %}
+                        {% for tipo in tipos %}
+                        <tr>
+                            <td>#{{ tipo.id }}</td>
+                            <td>{{ tipo.nome }}</td>
+                            <td>{{ tipo.grupo_nome }}</td>
+                            <td class="acoes-coluna">
+                                <button class="btn btn-action btn-warning"
+                                        title="Editar"
+                                        onclick="abrirModalEditarTipo('{{ tipo.id }}', '{{ tipo.nome }}', '{{ tipo.grupo_id }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+
+                                <form method="POST" action="{{ url_for('admin_gestao_clientes') }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Excluir este tipo de cliente?');">
+                                    <input type="hidden" name="acao" value="excluir_tipo">
+                                    <input type="hidden" name="tipo_id" value="{{ tipo.id }}">
+                                    <button type="submit" class="btn btn-action btn-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="4" style="text-align:center;">Nenhum tipo cadastrado.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================= -->
+<!-- MODAL DE EDIÇÃO (GENÉRICO) -->
+<!-- ========================================= -->
+<div id="modal-editar" class="modal-overlay hidden">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3 id="modal-titulo">Editar</h3>
+            <button class="modal-close-btn" onclick="fecharModalEditar()">&times;</button>
+        </div>
+
+        <form id="form-editar" method="POST" action="{{ url_for('admin_gestao_clientes') }}">
+            <input type="hidden" name="acao" id="edit-acao">
+            <input type="hidden" name="id" id="edit-id">
+
+            <div class="form-group">
+                <label for="edit-nome">Nome</label>
+                <input type="text" id="edit-nome" name="nome" required>
+            </div>
+
+            <div class="form-group" id="edit-grupo-wrapper" style="display:none;">
+                <label for="edit-grupo-id">Grupo Vinculado</label>
+                <select id="edit-grupo-id" name="grupo_id">
+                    {% for g in grupos %}
+                        <option value="{{ g.id }}">{{ g.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="fecharModalEditar()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Salvar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

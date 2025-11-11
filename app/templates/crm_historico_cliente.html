@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block title %}Histórico do Cliente{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-user-clock"></i>
+        Histórico do Cliente
+    </h1>
+</div>
+
+<div class="info-card">
+    <h3>
+        <i class="fas fa-search"></i>
+        Buscar Cliente
+    </h3>
+
+    <form class="form-minimal" method="GET" action="{{ url_for('crm_historico_cliente') }}">
+        <div class="form-grid-3"> {# Novo layout em grid de 3 colunas #}
+            <div class="form-group">
+                <label for="termo_busca">ID/RA/Polo ou Nome do Cliente</label>
+                <input type="text" id="termo_busca" name="termo_busca"
+                       value="{{ termo_busca | default('') }}"
+                       placeholder="Digite para buscar...">
+            </div>
+
+            <div class="form-group">
+                <label for="filtro_setor_id">Filtrar por Setor</label>
+                <select id="filtro_setor_id" name="filtro_setor_id">
+                    <option value="">Todos os Setores</option>
+                    {% for setor in lista_setores_todos %} {# Precisamos passar esta variável do Python #}
+                        <option value="{{ setor.id }}" {% if filtro_setor_id | string == setor.id | string %}selected{% endif %}>
+                            {{ setor.nome_setor }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="data_inicio">Data de Início</label>
+                <input type="date" id="data_inicio" name="data_inicio"
+                       value="{{ data_inicio | default('') }}">
+            </div>
+
+            <div class="form-group">
+                <label for="data_fim">Data de Fim</label>
+                <input type="date" id="data_fim" name="data_fim"
+                       value="{{ data_fim | default('') }}">
+            </div>
+
+            <div class="form-group form-group-stretch"> {# Este grupo vai esticar para preencher o espaço #}
+                <label>&nbsp;</label> {# Label vazio para alinhar o botão #}
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+
+                <button type="button"
+                        class="btn btn-secondary btn-block"
+                        style="margin-top: 10px;"
+                        onclick="window.location.href='{{ url_for('crm_historico_cliente') }}'">
+                    <i class="fas fa-times"></i> Limpar
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% if cliente %}
+    <div class="info-card" style="margin-top: 20px;">
+        <h3 class="info-card-header">
+            <i class="fas fa-user"></i>
+            Resultados para: {{ cliente.nome }}
+        </h3>
+        <div class="detalhe-item">
+            <span>ID (Interno):</span>
+            <strong>#{{ cliente.id }}</strong>
+        </div>
+        <div class="detalhe-item">
+            <span>ID (Principal):</span>
+            <strong>{{ cliente.identificador_principal | default('N/A') }}</strong>
+        </div>
+        <div class="detalhe-item">
+            <span>E-mail:</span>
+            <strong>{{ cliente.email | default('N/A') }}</strong>
+        </div>
+        <div class="detalhe-item">
+            <span>Telefone:</span>
+            <strong>{{ cliente.telefone | default('N/A') }}</strong>
+        </div>
+    </div>
+
+    <div class="info-card" style="margin-top: 20px;">
+        <h3>
+            <i class="fas fa-history"></i>
+            Histórico de Atendimentos ({{ atendimentos | length }})
+        </h3>
+        <div class="table-container-simple">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>Status (Workflow)</th>
+                        <th>Status (Interno)</th>
+                        <th>Duração (Horas)</th>
+                        <th>Follow Up</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if atendimentos %}
+                        {% for a in atendimentos %}
+                        <tr>
+                            <td>#{{ a.id }}</td>
+                            <td data-label="Título">{{ a.titulo }}</td>
+
+                            <td data-label="Status (Workflow)">
+                                <span class="status-badge status-{{ a.status_fila | lower | replace(' ', '-') }}">
+                                    {{ a.status_fila }}
+                                </span>
+                            </td>
+
+                            <td data-label="Status (Interno)">{{ a.status_interno }}</td>
+
+                            <td data-label="Duração (h)">
+                                {% if a.status_fila in ['Resolvido', 'Fechado'] %}
+                                    {{ a.duracao_horas | default('N/A') }} h
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <td data-label="PDS">
+                                {% if a.pds_gerar == 0 %}
+                                    N/A
+                                {% else %}
+                                    {{ a.pds_status }}
+                                {% endif %}
+                            </td>
+
+                            <td data-label="Ações">
+                                <a href="{{ url_for('crm_detalhe_atendimento', atendimento_id=a.id) }}"
+                                   class="btn btn-action btn-secondary"
+                                   title="Ver Detalhes">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" style="text-align: center;">Nenhum atendimento encontrado para este cliente.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+{% elif termo_busca %}
+    <div class="info-card" style="margin-top: 20px;">
+        <p style="text-align: center; color: var(--dark-gray);">
+            Nenhum cliente encontrado. Tente buscar pelo RA/Polo ou pelo nome completo.
+        </p>
+    </div>
+{% endif %}
+{% endblock %}

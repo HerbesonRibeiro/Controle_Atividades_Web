@@ -3,145 +3,200 @@
 {% block title %}Histórico de Atividades{% endblock %}
 
 {% block content %}
-    <h1><i class="fas fa-history icon-title"></i> Histórico de Atividades</h1>
+<div class="content-container">
+
+    <h1 class="page-title"><i class="fas fa-history"></i> Histórico de Atividades</h1>
 
     <div class="info-card">
         <form method="GET" action="{{ url_for('historico') }}">
+            <h3 style="margin-top: 0; margin-bottom: 20px;">
+                <i class="fas fa-filter"></i> Filtros
+            </h3>
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="tipo_filtro">Tipo de Atendimento:</label>
+                    <label for="tipo_filtro">Tipo de Atendimento</label>
                     <select name="tipo_filtro" id="tipo_filtro">
-                        <option value="">Todos</option>
+                        <option value="">Todos os Tipos</option>
                         {% for tipo in tipos_atendimento %}
-                            <option value="{{ tipo.nome }}" {% if tipo.nome == filtros_aplicados.get('tipo_filtro') %}selected{% endif %}>
-                                {{ tipo.nome }}
-                            </option>
+                        <option value="{{ tipo.nome }}" {% if tipo.nome == filtros_aplicados.tipo_filtro %}selected{% endif %}>
+                            {{ tipo.nome }}
+                        </option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="data_ini">De:</label>
+                    <label for="data_ini">Data Início:</label>
                     <input type="date" name="data_ini" id="data_ini" value="{{ filtros_aplicados.get('data_ini', '') }}">
                 </div>
                 <div class="form-group">
-                    <label for="data_fim">Até:</label>
+                    <label for="data_fim">Data Fim:</label>
                     <input type="date" name="data_fim" id="data_fim" value="{{ filtros_aplicados.get('data_fim', '') }}">
                 </div>
             </div>
+
             <div class="form-row">
+                {% if session.colaborador_perfil in ['Administrador', 'Gestor'] %}
                 <div class="form-group">
-                    <label for="colaborador_filtro">Colaborador:</label>
+                    <label for="colaborador_filtro">Colaborador</label>
                     <select name="colaborador_filtro" id="colaborador_filtro">
-                        <option value="">Todos</option>
-                        {% for colaborador in lista_colaboradores %}
-                            <option value="{{ colaborador.id }}" {% if colaborador.id|string == filtros_aplicados.get('colaborador_filtro') %}selected{% endif %}>
-                                {{ colaborador.nome }}
-                            </option>
+                        <option value="">Todos os Colaboradores</option>
+                        {% for colab in lista_colaboradores %}
+                        <option value="{{ colab.id }}" {% if colab.id|string == filtros_aplicados.get('colaborador_filtro') %}selected{% endif %}>
+                            {{ colab.nome }}
+                        </option>
                         {% endfor %}
                     </select>
                 </div>
+                {% endif %}
+
+                {% if session.colaborador_perfil == 'Administrador' %}
                 <div class="form-group">
-                    <label for="setor_filtro">Setor:</label>
+                    <label for="setor_filtro">Setor</label>
                     <select name="setor_filtro" id="setor_filtro">
-                        <option value="">Todos</option>
-                        {% for setor in lista_setores %}
-                             <option value="{{ setor.id }}" {% if setor.id|string == filtros_aplicados.get('setor_filtro') %}selected{% endif %}>
-                                {{ setor.nome_setor }}
-                            </option>
+                        <option value="">Todos os Setores</option>
+                         {% for setor in lista_setores %}
+                        <option value="{{ setor.id }}" {% if setor.id|string == filtros_aplicados.get('setor_filtro') %}selected{% endif %}>
+                            {{ setor.nome_setor }}
+                        </option>
                         {% endfor %}
                     </select>
                 </div>
+                {% endif %}
+            </div>
+
+            <div class="form-row">
                 <div class="form-group">
                     <label for="descricao_filtro">Buscar na Descrição:</label>
                     <input type="text" name="descricao_filtro" id="descricao_filtro" value="{{ filtros_aplicados.get('descricao_filtro', '') }}" placeholder="Digite uma palavra-chave...">
                 </div>
             </div>
-            <div class="form-row form-buttons">
-                <a href="{{ url_for('historico') }}" class="btn-secondary btn-small">Limpar Filtros</a>
-                <button type="submit" class="btn-primary btn-small">Filtrar</button>
+
+            <div class="form-row" style="justify-content: flex-end; margin-top: 20px; margin-bottom: 0;">
+                <div style="display: flex; gap: 10px;">
+                    <a href="{{ url_for('historico') }}" class="btn btn-secondary">Limpar Filtros</a>
+                    <button type="submit" class="btn btn-primary">Buscar</button>
+                </div>
             </div>
         </form>
     </div>
 
     <div class="info-card">
-        <form id="bulk-action-form" method="POST" action="{{ url_for('excluir_massa') }}">
-
+        <form id="bulk-action-form" action="{{ url_for('excluir_massa') }}" method="POST">
             <div class="action-bar">
-                <div class="action-buttons">
+                <div>
                     <button type="button" id="edit-selected-btn" class="btn-action btn-edit" disabled>
-                        <i class="fas fa-pencil-alt"></i> Editar
+                        <i class="fas fa-edit"></i> Editar Selecionado
                     </button>
                     <button type="submit" id="delete-selected-btn" class="btn-action btn-delete" disabled>
                         <i class="fas fa-trash-alt"></i> Excluir Selecionados
                     </button>
                 </div>
-                <div id="selection-counter" class="selection-counter">Nenhum item selecionado</div>
-            </div>
-
-            <div class="table-container">
-                <table class="table-uppercase">
-                    <thead>
-                        <tr>
-                            <th style="width: 30px;"><input type="checkbox" id="select-all-checkbox"></th>
-                            <th>Data</th>
-                            <th>Colaborador</th>
-                            <th>Tipo</th>
-                            <th>Nº/ Ticket</th>
-                            <th>Descrição</th>
-                            <th>Status</th>
-                            <th style="width: 80px; text-align: center;">Detalhes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for atividade in lista_atividades %}
-                        <tr>
-                            <td><input type="checkbox" name="selecao_ids" value="{{ atividade.id }}" class="row-checkbox"></td>
-                            <td>{{ atividade.data_atendimento.strftime('%d/%m/%Y') if atividade.data_atendimento }}</td>
-                            <td>{{ atividade.colaborador_nome }}</td>
-                            <td>{{ atividade.tipo_atendimento }}</td>
-                            <td>{{ atividade.numero_atendimento }}</td>
-                            <td class="truncate">{{ atividade.descricao }}</td>
-                            <td>{{ atividade.status }}</td>
-                            <td class="actions-cell">
-                                <button type="button" class="btn-action btn-details"
-                                        data-id="{{ atividade.id }}"
-                                        data-data="{{ atividade.data_atendimento.strftime('%d/%m/%Y') if atividade.data_atendimento }}"
-                                        data-tipo="{{ atividade.tipo_atendimento }}"
-                                        data-numero="{{ atividade.numero_atendimento }}"
-                                        data-colaborador="{{ atividade.colaborador_nome }}"
-                                        data-status="{{ atividade.status }}"
-                                        data-descricao="{{ atividade.descricao }}">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="8" style="text-align: center;">Nenhuma atividade encontrada.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <span id="selection-counter" class="selection-counter">0 itens selecionados</span>
             </div>
         </form>
-    </div>
 
-    {% if total_pages > 1 %}
+        <div class="table-container" style="margin-bottom: 0; border: none; max-height: none;">
+            <table class="table-uppercase">
+                <thead>
+                    <tr>
+                        <th style="width: 4%;"><input type="checkbox" id="select-all-checkbox" title="Selecionar todos"></th>
+                        <th style="width: 10%;">Data</th>
+                        <th style="width: 15%;">Colaborador</th>
+                        <th style="width: 15%;">Tipo</th>
+                        <th style="width: 10%;">Nº Atendimento</th>
+                        <th style="width: 31%;">Descrição</th>
+                        <th style="width: 10%;">Status</th>
+                        <th style="width: 5%; text-align: center;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for atividade in lista_atividades %}
+                    <tr>
+                        <td><input type="checkbox" class="row-checkbox" name="selecao_ids" value="{{ atividade.id }}"></td>
+
+                        <td title="{{ atividade.data_atendimento.strftime('%d/%m/%Y %H:%M:%S') }}">
+                            {{ atividade.data_atendimento.strftime('%d/%m/%Y') }}
+                        </td>
+
+                        <td>{{ atividade.colaborador_nome }}</td>
+
+                        <td>{{ atividade.tipo_atendimento }}</td>
+
+                        <td>{{ atividade.numero_atendimento or 'N/A' }}</td>
+
+                        <td title="{{ atividade.descricao }}">{{ atividade.descricao }}</td>
+
+                        <td>
+                            {{ atividade.status }}
+                        </td>
+
+                        <td style="text-align: center;">
+                            <button type="button" class="btn-action btn-details" title="Ver Detalhes"
+                                    data-id="{{ atividade.id }}"
+                                    data-data="{{ atividade.data_atendimento.strftime('%d/%m/%Y %H:%M') }}"
+                                    data-tipo="{{ atividade.tipo_atendimento }}"
+                                    data-numero="{{ atividade.numero_atendimento or 'N/A' }}"
+                                    data-colaborador="{{ atividade.colaborador_nome }}"
+                                    data-status="{{ atividade.status }}"
+                                    data-descricao="{{ atividade.descricao }}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <a href="{{ url_for('excluir_atividade', id=atividade.id) }}" class="btn-action btn-delete" title="Excluir">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 30px;">
+                            <i class="fas fa-folder-open" style="font-size: 3rem; color: #6c757d; margin-bottom: 15px; opacity: 0.5;"></i>
+                            <p style="color: #6c757d; margin: 0;">
+                                {% if filtros_aplicados %}
+                                    Nenhuma atividade encontrada com os filtros aplicados.
+                                {% else %}
+                                    Nenhuma atividade registrada ainda.
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div> {% if total_pages > 1 %}
     <div class="pagination">
-        {% if current_page > 1 %}<a href="{{ url_for('historico', page=current_page-1, **filtros_aplicados) }}">&laquo;</a>{% else %}<span class="disabled">&laquo;</span>{% endif %}
-        {% set max_pages_to_show = 10 %}{% set start_page = [1, current_page - 4] | max %}{% set end_page = [total_pages, start_page + max_pages_to_show - 1] | min %}
-        {% if start_page > 1 %}<a href="{{ url_for('historico', page=1, **filtros_aplicados) }}">1</a>{% if start_page > 2 %}<span class="disabled">...</span>{% endif %}{% endif %}
-        {% for page_num in range(start_page, end_page + 1) %}{% if page_num == current_page %}<span class="active">{{ page_num }}</span>{% else %}<a href="{{ url_for('historico', page=page_num, **filtros_aplicados) }}">{{ page_num }}</a>{% endif %}{% endfor %}
-        {% if end_page < total_pages %}{% if end_page < total_pages - 1 %}<span class="disabled">...</span>{% endif %}<a href="{{ url_for('historico', page=total_pages, **filtros_aplicados) }}">{{ total_pages }}</a>{% endif %}
-        {% if current_page < total_pages %}<a href="{{ url_for('historico', page=current_page+1, **filtros_aplicados) }}">&raquo;</a>{% else %}<span class="disabled">&raquo;</span>{% endif %}
+        {% if current_page > 1 %}
+            <a href="{{ url_for('historico', page=current_page-1, **filtros_aplicados) }}">&laquo; Anterior</a>
+        {% else %}
+            <span class="disabled">&laquo; Anterior</span>
+        {% endif %}
+
+        {% for page_num in range(1, total_pages + 1) %}
+            {% if page_num == current_page %}
+                <span class="active">{{ page_num }}</span>
+            {% else %}
+                <a href="{{ url_for('historico', page=page_num, **filtros_aplicados) }}">{{ page_num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if current_page < total_pages %}
+            <a href="{{ url_for('historico', page=current_page+1, **filtros_aplicados) }}">&raquo; Próximo</a>
+        {% else %}
+            <span class="disabled">&raquo; Próximo</span>
+        {% endif %}
     </div>
     {% endif %}
 
-    <div id="details-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <button class="modal-close" id="close-details-modal-btn">&times;</button>
-            <h2><i class="fas fa-info-circle icon-title"></i> Detalhes da Atividade</h2>
-            <div id="modal-body"></div>
+</div> <div id="details-modal" class="modal-overlay hidden">
+    <div class="modal-container" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2 id="modal-title"><i class="fas fa-info-circle"></i> Detalhes da Atividade</h2>
+            <button id="close-details-modal-btn" class="modal-close-btn">&times;</button>
         </div>
+        <div id="modal-body" class="modal-body">
+            </div>
     </div>
+</div>
+
 {% endblock %}

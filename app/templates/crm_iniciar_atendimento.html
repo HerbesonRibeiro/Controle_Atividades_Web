@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+{% block title %}Iniciar Novo Atendimento (Triagem){% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-plus-circle"></i>
+        Iniciar Novo Atendimento (Triagem)
+    </h1>
+
+    <a href="{{ url_for('crm_fila_atendimento') }}" class="btn btn-secondary">
+        <i class="fas fa-tasks"></i>
+        Ir para Fila
+    </a>
+</div>
+
+<form id="triagem-form" method="POST" action="{{ url_for('crm_iniciar_atendimento') }}" novalidate>
+
+    <div class="triagem-layout">
+
+        <div class="info-card">
+            <h3>
+                <i class="fas fa-user-check"></i>
+                1. Identificação do Cliente
+            </h3>
+
+            <div class="form-group">
+                <label for="cliente_grupo">Grupo do Cliente</label>
+                <select id="cliente_grupo" name="cliente_grupo" required>
+                    <option value="" disabled selected>Selecione o Grupo...</option>
+                    {% for grupo in cliente_grupos %}
+                        <option value="{{ grupo.id }}">{{ grupo.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="cliente_tipo">Tipo de Cliente</label>
+                <select id="cliente_tipo" name="cliente_tipo" required disabled>
+                    <option value="" disabled selected>Selecione o Grupo primeiro...</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="bloco_identificador" style="display: none;">
+                <label for="identificador_principal" id="label_identificador">Identificador (RA, Polo, Matrícula)</label>
+                <input type="text" id="identificador_principal" name="identificador_principal">
+                <small id="helper_identificador">Digite o identificador para buscar. Se for novo, preencha os campos abaixo.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="cliente_nome">Nome do Cliente / Contato</label>
+                <input type="text" id="cliente_nome" name="cliente_nome" required>
+            </div>
+
+            <div class="form-group">
+                <label for="cliente_telefone">Telefone</label>
+                <input type="text" id="cliente_telefone" name="cliente_telefone">
+            </div>
+
+            <div class="form-group">
+                <label for="cliente_email">E-mail</label>
+                <input type="email" id="cliente_email" name="cliente_email">
+            </div>
+
+        </div> <div class="info-card">
+            <h3>
+                <i class="fas fa-clipboard-list"></i>
+                2. Detalhes do Atendimento
+            </h3>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="titulo">Título / Assunto</label>
+                    <input type="text" id="titulo" name="titulo" placeholder="Ex: Aluno com problema de login no Portal" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="descricao">Descrição (Histórico de Triagem)</label>
+                    <textarea id="descricao" name="descricao" rows="10" placeholder="Descreva em detalhes a solicitação do cliente..." required></textarea>
+                </div>
+            </div>
+        </div> <div class="info-card">
+            <h3>
+                <i class="fas fa-tags"></i>
+                3. Contexto e Classificação
+            </h3>
+
+            <div class="form-group">
+                <label for="origem">Origem do Contato</label>
+                <select id="origem" name="origem" required>
+                    <option value="" disabled selected>Selecione a Origem...</option>
+                    {% for o in origens %}
+                        <option value="{{ o.id }}">{{ o.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="tipo_atendimento">Tipo de Atendimento</label>
+                <select id="tipo_atendimento" name="tipo_atendimento" required>
+                    <option value="" disabled selected>Selecione o Tipo...</option>
+                    {% for t in tipos_atendimento %}
+                        <option value="{{ t.id }}">{{ t.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="nivel_complexidade">Nível de Complexidade</label>
+                <select id="nivel_complexidade" name="nivel_complexidade" required>
+                    <option value="baixo" selected>Baixo</option>
+                    <option value="medio">Médio</option>
+                    <option value="grave">Grave</option>
+                    <option value="gravissimo">Gravíssimo</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="numero_atendimento_externo">Ticket/Nº Telefone (Se Necessário)</label>
+                <input type="text" id="numero_atendimento_externo" name="numero_atendimento_externo">
+            </div>
+
+        </div> </div> <div class="form-row" style="justify-content: center; margin-top: 20px;">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-play"></i> Iniciar Atendimento e Mover para Triagem
+        </button>
+    </div>
+</form> <script defer>
+    // Executa o script quando o DOM (a página) estiver pronto
+    document.addEventListener('DOMContentLoaded', function() {
+
+        // Seleciona os elementos do formulário
+        const form = document.getElementById('triagem-form');
+        const grupoSelect = document.getElementById('cliente_grupo');
+        const tipoSelect = document.getElementById('cliente_tipo');
+        const identificadorInput = document.getElementById('identificador_principal');
+        const identificadorLabel = document.getElementById('label_identificador');
+        const identificadorHelper = document.getElementById('helper_identificador');
+        const identificadorBloco = document.getElementById('bloco_identificador');
+        const nomeInput = document.getElementById('cliente_nome');
+        const emailInput = document.getElementById('cliente_email');
+        const telefoneInput = document.getElementById('cliente_telefone');
+
+        // --- 1. LÓGICA DO DROPDOWN DE GRUPO/TIPO (AJAX 1) ---
+        grupoSelect.addEventListener('change', function() {
+            const grupoId = this.value;
+
+            // Limpa e desabilita o dropdown de Tipo
+            tipoSelect.innerHTML = '<option value="" disabled selected>Carregando...</option>';
+            tipoSelect.disabled = true;
+
+            if (!grupoId) return;
+
+            // Busca na nossa API os tipos do grupo selecionado
+            fetch(`/api/cliente-tipos/${grupoId}`)
+                .then(response => response.json())
+                .then(data => {
+                    tipoSelect.innerHTML = '<option value="" disabled selected>Selecione o Tipo...</option>';
+                    data.forEach(tipo => {
+                        const option = new Option(tipo.nome, tipo.id);
+                        tipoSelect.add(option);
+                    });
+                    tipoSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar tipos de cliente:', error);
+                    tipoSelect.innerHTML = '<option value="" disabled>Erro ao carregar</option>';
+                });
+        });
+
+        // --- 2. LÓGICA DO CAMPO DE IDENTIFICADOR (Ocultar/Exibir) ---
+        tipoSelect.addEventListener('change', function() {
+            const tipoSelecionado = tipoSelect.options[tipoSelect.selectedIndex].text;
+
+            // Lógica baseada no "Acordo v5"
+            // (Estudante, Polo = Pede Identificador)
+            // (Tutor, Gestor, etc. = Pede Nome, gera ID automático)
+
+            if (tipoSelecionado.toLowerCase().includes('estudante')) {
+                identificadorLabel.textContent = 'RA do Aluno';
+                identificadorHelper.textContent = 'Digite o RA para buscar. Se for novo, preencha os campos abaixo.';
+                identificadorBloco.style.display = 'block';
+                identificadorInput.required = true;
+
+            } else if (tipoSelecionado.toLowerCase().includes('polo')) {
+                identificadorLabel.textContent = 'Nº do Polo';
+                identificadorHelper.textContent = 'Digite o Nº do Polo para buscar. Se for novo, preencha os campos abaixo.';
+                identificadorBloco.style.display = 'block';
+                identificadorInput.required = true;
+
+            } else {
+                // Para Cliente Interno (Tutor, Gestor, etc.) ou outros
+                // O identificador não é obrigatório e será gerado (Ex: INT-0001)
+                // O campo de busca principal será o NOME.
+                identificadorLabel.textContent = 'Identificador (Opcional)';
+                identificadorHelper.textContent = 'Busca pelo nome. Um ID interno será gerado se for novo.';
+                identificadorBloco.style.display = 'block'; // Mostra, mas não é obrigatório
+                identificadorInput.required = false;
+            }
+
+            // Limpa a busca anterior
+            identificadorInput.value = '';
+            limparCamposCliente();
+        });
+
+        // --- 3. LÓGICA DA BUSCA DE CLIENTE (AJAX 2) ---
+        identificadorInput.addEventListener('change', function() {
+            // Usamos 'change' (ou 'blur') para não chamar a API a cada tecla
+            const identificador = this.value.trim();
+
+            if (!identificador) {
+                limparCamposCliente();
+                return;
+            }
+
+            // Busca na nossa API pelo identificador
+            fetch(`/api/cliente-buscar/${identificador}`)
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('Cliente não encontrado');
+                })
+                .then(cliente => {
+                    // Cliente ENCONTRADO! Auto-preenche os campos
+                    if (cliente) {
+                        nomeInput.value = cliente.nome;
+                        emailInput.value = cliente.email || '';
+                        telefoneInput.value = cliente.telefone || '';
+
+                        // Trava os campos para evitar edição acidental
+                        nomeInput.readOnly = true;
+                        emailInput.readOnly = true;
+                        telefoneInput.readOnly = true;
+                        identificadorHelper.textContent = 'Cliente encontrado! Os dados foram preenchidos.';
+                        identificadorHelper.style.color = 'green';
+                    }
+                })
+                .catch(error => {
+                    // Cliente NÃO ENCONTRADO. Libera os campos para NOVO cadastro.
+                    console.warn(error.message);
+                    limparCamposCliente();
+                });
+        });
+
+        // Função utilitária para limpar e destravar os campos do cliente
+        function limparCamposCliente() {
+            nomeInput.value = '';
+            emailInput.value = '';
+            telefoneInput.value = '';
+
+            nomeInput.readOnly = false;
+            emailInput.readOnly = false;
+            telefoneInput.readOnly = false;
+
+            const tipoSelecionado = tipoSelect.options[tipoSelect.selectedIndex]?.text || '';
+            if (tipoSelecionado.toLowerCase().includes('estudante') || tipoSelecionado.toLowerCase().includes('polo')) {
+                 identificadorHelper.textContent = 'Cliente não encontrado. Preencha os campos abaixo para criar um novo.';
+            }
+            identificadorHelper.style.color = '#6c757d'; // Cor padrão (dark-gray)
+        }
+
+    });
+</script>
+{% endblock %}

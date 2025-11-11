@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pesquisa de Satisfação - Obrigado</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-color: #b31217; /* Vermelho institucional UNINTA */
+            --primary-light: #e94c52;
+            --bg-color: #f6f8fa;
+            --card-bg: #ffffff;
+            --text-color: #222;
+            --muted-color: #6b6b6b;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 25px;
+        }
+
+        .pds-container {
+            width: 100%;
+            max-width: 520px;
+            text-align: center;
+        }
+
+        .pds-logo img {
+            max-width: 160px;
+            margin-bottom: 25px;
+        }
+
+        .pds-card {
+            background-color: var(--card-bg);
+            border-radius: 18px;
+            padding: 40px 30px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+            transition: all 0.3s ease;
+        }
+
+        .pds-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+        }
+
+        .pds-icon {
+            font-size: 55px;
+            margin-bottom: 15px;
+        }
+
+        .pds-icon.success {
+            color: var(--success-color);
+        }
+
+        .pds-icon.error {
+            color: var(--danger-color);
+        }
+
+        h3 {
+            color: var(--text-color);
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: var(--muted-color);
+            font-size: 14px;
+            margin: 10px 0 0;
+        }
+
+        .btn {
+            margin-top: 25px;
+            display: inline-block;
+            padding: 10px 25px;
+            background-color: var(--primary-color);
+            color: #fff;
+            border-radius: 25px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.25s ease;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-light);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="pds-container">
+        <div class="pds-logo">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo UNINTA">
+        </div>
+
+        <div class="pds-card">
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="pds-icon {% if category == 'success' %}success{% else %}error{% endif %}">
+                            {% if category == 'success' %}
+                                <i class="fas fa-check-circle"></i>
+                            {% else %}
+                                <i class="fas fa-exclamation-triangle"></i>
+                            {% endif %}
+                        </div>
+                        <h3>{{ message }}</h3>
+                    {% endfor %}
+                {% else %}
+                    <div class="pds-icon success"><i class="fas fa-check-circle"></i></div>
+                    <h3>Pesquisa enviada com sucesso!</h3>
+                {% endif %}
+            {% endwith %}
+
+            <p>Obrigado por sua colaboração.<br>
+               Sua opinião é muito importante para o UNINTA 💬</p>
+
+            <a href="https://uninta.online/" class="btn">
+                <i class="fas fa-home"></i> Ir para o site
+            </a>
+        </div>
+    </div>
+</body>
+</html>
