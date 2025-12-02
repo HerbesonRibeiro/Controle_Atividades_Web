@@ -207,28 +207,48 @@ document.addEventListener('DOMContentLoaded', function() {
 function abrirModalAtividadesHoje() {
     const modal = document.getElementById('modal-hoje-setor');
     if (modal) {
-        // No CSS refatorado, usamos classes 'hidden', não 'display'
+        // Força o display a aparecer, sobrescrevendo o style="none" do HTML
+        modal.style.display = 'flex';
+
+        // Remove a classe hidden também, só por garantia
         modal.classList.remove('hidden');
+
         carregarDadosModalSetores();
+    }
+}
+function fecharModalSetoresHoje() {
+    const modal = document.getElementById('modal-hoje-setor');
+    if (modal) {
+        // Força o modal a sumir
+        modal.style.display = 'none';
+        // Adiciona a classe hidden para manter padrão
+        modal.classList.add('hidden');
     }
 }
 
 /**
  * Ponto de entrada do Modal para o fluxo do GESTOR.
  */
+/**
+ * Ponto de entrada do Modal para o fluxo do GESTOR.
+ */
 function abrirModalColaboradoresGestor(setorId, setorNome) {
     const modal = document.getElementById('modal-hoje-setor');
     if (modal) {
+        // 1. Força o modal a ficar visível (sobrescreve o display: none)
+        modal.style.display = 'flex';
+
+        // 2. Remove a classe hidden (para garantir)
         modal.classList.remove('hidden');
+
+        // 3. Carrega os dados usando o ID do setor que veio do Python
         carregarDadosModalColaboradores(setorId, setorNome, false);
     }
 }
-
 /**
  * Carrega o Estágio 1 do modal (Lista de Setores).
  */
 function carregarDadosModalSetores() {
-    // ... (seu código, que está correto) ...
     const modalBody = document.getElementById('modal-body-setores');
     const modalTitle = document.getElementById('modal-title');
     const backBtn = document.getElementById('modal-back-btn');
@@ -239,17 +259,29 @@ function carregarDadosModalSetores() {
 
     modalBody.innerHTML = '<tr><td colspan="2">Carregando...</td></tr>';
 
-    fetch('/api/atividades-hoje-por-setor')
+    // CORREÇÃO 1: A URL deve ser EXATAMENTE igual à rota do Python
+    fetch('/api/atividades-hoje-setor')
         .then(response => response.json())
         .then(data => {
             modalBody.innerHTML = '';
+
+            // Verifica se veio erro
+            if (data.error) {
+                console.error(data.error);
+                modalBody.innerHTML = '<tr><td colspan="2">Erro ao carregar dados.</td></tr>';
+                return;
+            }
+
             if (data.length === 0) {
                 modalBody.innerHTML = '<tr><td colspan="2">Nenhuma atividade registrada hoje.</td></tr>';
                 return;
             }
+
             data.forEach(item => {
+                // CORREÇÃO 2: Usar 'item.id' (que vem do SELECT s.id)
+                // em vez de 'item.setor_id'.
                 const row = `
-                    <tr onclick="carregarDadosModalColaboradores(${item.setor_id}, '${item.nome_setor}')" style="cursor: pointer;" title="Ver detalhes de ${item.nome_setor}">
+                    <tr onclick="carregarDadosModalColaboradores(${item.id}, '${item.nome_setor}')" style="cursor: pointer;" title="Ver detalhes de ${item.nome_setor}">
                         <td>${item.nome_setor}</td>
                         <td>${item.total}</td>
                     </tr>
@@ -380,35 +412,80 @@ function mostrarToast(mensagem, tipo = "info") {
     setTimeout(() => toast.remove(), 3000);
 }
 
-function abrirModalPDS(q1, q2, q3, event) {
+/* ==========================================================================
+   [MODAL DE PESQUISA DE SATISFAÇÃO]
+   Atualizado para exibir Sim/Não/Parcialmente e Nota de 1 a 5
+   ========================================================================== */
+
+function abrirModalPDS(q1, q2, event) {
     if (event) event.stopPropagation();
 
     const modal = document.getElementById('modal-pds');
     const body = document.getElementById('modal-pds-body');
 
-    if (!modal || !body) return;
+    if (!modal || !body) {
+        console.error("Modal PDS não encontrado no HTML");
+        return;
+    }
 
+    // 1. Definição da Cor e Ícone para a Q1 (Texto)
+    let badgeClass = 'status-secondary'; // Padrão cinza
+    let icon = 'fa-question-circle';
+    let textoQ1 = q1 || 'Não informado';
+
+    if (q1 === 'Sim') {
+        badgeClass = 'status-success'; // Verde
+        icon = 'fa-check-circle';
+    } else if (q1 === 'Não') {
+        badgeClass = 'status-danger'; // Vermelho
+        icon = 'fa-times-circle';
+    } else if (q1 === 'Parcialmente') {
+        badgeClass = 'status-warning'; // Amarelo
+        icon = 'fa-adjust';
+    }
+
+    // 2. Geração das Estrelas para a Q2 (Nota 1 a 5)
+    let estrelasHTML = '';
+    const nota = parseInt(q2) || 0;
+
+    for (let i = 1; i <= 5; i++) {
+        if (i <= nota) {
+            estrelasHTML += '<i class="fas fa-star" style="color: #ffc107; margin-right: 2px;"></i>'; // Estrela cheia (amarela)
+        } else {
+            estrelasHTML += '<i class="far fa-star" style="color: #ccc; margin-right: 2px;"></i>'; // Estrela vazia (cinza)
+        }
+    }
+
+    // 3. Monta o HTML do Modal
     body.innerHTML = `
-        <div class="pds-resposta">
-            <strong>1. Sua demanda foi atendida?</strong><br>
-            <span class="${q1 === 'sim' ? 'text-success' : 'text-danger'}">
-                ${q1 === 'sim' ? 'Sim' : 'Não'}
-            </span>
-        </div>
-        <hr>
-        <div class="pds-resposta">
-            <strong>2. Nota para o atendimento:</strong><br>
-            <span class="nota-badge">${q2}</span> de 5
-        </div>
-        <hr>
-        <div class="pds-resposta">
-            <strong>3. Recomendação UNINTA:</strong><br>
-            <span class="nota-badge">${q3}</span> de 10
+        <div style="text-align: left; padding: 10px;">
+
+            <div style="margin-bottom: 25px;">
+                <p style="margin: 0 0 8px; font-weight: 600; color: #555;">1. Sua demanda foi atendida?</p>
+                <span class="status-badge ${badgeClass}" style="font-size: 1rem; padding: 6px 15px;">
+                    <i class="fas ${icon}"></i> ${textoQ1}
+                </span>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+            <div>
+                <p style="margin: 0 0 8px; font-weight: 600; color: #555;">2. Nota para o atendimento:</p>
+                <div style="font-size: 1.5rem;">
+                    ${estrelasHTML}
+                    <span style="font-size: 1rem; color: #777; margin-left: 10px; font-weight: 600;">
+                        (${nota}/5)
+                    </span>
+                </div>
+            </div>
+
         </div>
     `;
 
+    // 4. Abre o modal
     modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
+    modal.style.display = 'flex'; // Garante que o flex do CSS funcione
+    document.body.style.overflow = 'hidden'; // Trava a rolagem do fundo
 }
 
 function fecharModalPDS() {

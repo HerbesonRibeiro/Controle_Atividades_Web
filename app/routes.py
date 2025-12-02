@@ -962,24 +962,37 @@ def get_dados_extras_setor(db, setor_id):
 # [2] Rota Principal do Dashboard
 # -----------------------------------------------------------------------------
 @app.route('/dashboard')
-@login_required  # Protegido por login
+@login_required
 def dashboard():
     """
     Rota de BI (Business Intelligence) da aplicação.
-    Exibe uma visão de dashboard adaptativa com base no perfil do usuário
-    (Administrador ou Gestor) e implementa caching de dados para performance.
+    Agora suporta Filtros de Data Dinâmicos.
     """
 
-    # [Etapa 1: Lógica de Personificação]
-    # Determina o contexto de visualização (Admin vendo como ele mesmo ou como Gestor).
+    # --- [0] Captura e Tratamento de Datas (FILTROS) ---
+    data_inicio_str = request.args.get('data_inicio')
+    data_fim_str = request.args.get('data_fim')
+    hoje = date.today()
+
+    # Se o usuário não escolheu datas, define o padrão (Dia 1 do mês até hoje)
+    if data_inicio_str and data_fim_str:
+        data_inicio = data_inicio_str
+        data_fim = data_fim_str
+    else:
+        data_7_dias_atras = hoje - timedelta(days=7)
+        data_inicio = data_7_dias_atras.strftime('%Y-%m-%d')
+        data_fim = hoje.strftime('%Y-%m-%d')
+
+    # Objeto para devolver ao HTML (preenche os inputs)
+    filtros = {'data_inicio': data_inicio, 'data_fim': data_fim}
+
+    # --- [Etapa 1: Lógica de Personificação] ---
     perfil_original = session.get('colaborador_perfil')
     user_id_original = session.get('colaborador_id')
-
     view_as_user_id = request.args.get('view_as_user_id')
     is_impersonating = False
 
     if perfil_original == 'Administrador' and view_as_user_id:
-        # Admin está tentando ver como um Gestor
         query_gestor_alvo = "SELECT c.id, p.nome as perfil_nome FROM colaboradores c JOIN perfis p ON c.perfil_id = p.id WHERE c.id = %s"
         gestor_alvo = db.execute_query(query_gestor_alvo, (view_as_user_id,), fetch='one')
         if gestor_alvo and gestor_alvo['perfil_nome'] == 'Gestor':
@@ -990,81 +1003,121 @@ def dashboard():
             perfil = perfil_original
             user_id = user_id_original
     else:
-        # Visualização normal (Admin como Admin, Gestor como Gestor)
         perfil = perfil_original
         user_id = user_id_original
 
-    # [Etapa 2: Cláusula de Guarda de Perfil]
-    # Colaboradores não acessam este dashboard; eles são redirecionados.
+    # --- [Etapa 2: Cláusula de Guarda] ---
     if perfil_original == 'Colaborador':
         flash('Você não tem permissão para acessar o dashboard.', 'warning')
         return redirect(url_for('index'))
 
-    # [Etapa 3: Verificação de Cache]
-    # Tenta servir dados do cache antes de executar queries pesadas.
+    # --- [Etapa 3: Verificação de Cache Inteligente] ---
     now = datetime.now()
-    cache_key = str(user_id) if perfil == 'Gestor' else perfil
+
+    # ATENÇÃO: A chave do cache agora inclui as DATAS.
+    # Isso impede que um filtro antigo apareça quando você muda a data.
+    base_key = str(user_id) if perfil == 'Gestor' else perfil
+    cache_key = f"{base_key}_{data_inicio}_{data_fim}"
+
     cache_data_source = dashboard_cache['Gestor'] if perfil == 'Gestor' else dashboard_cache
     cache_entry = cache_data_source.get(cache_key)
 
     if not is_impersonating and cache_entry and cache_entry.get('data') and \
             (now < cache_entry.get('last_updated') + timedelta(minutes=CACHE_DURATION_MINUTES)):
-
-        print(f"INFO: Servindo dashboard para {perfil} {user_id} via CACHE.")
+        print(f"INFO: Servindo dashboard via CACHE ({cache_key}).")
         template_data = cache_entry['data']
 
     else:
-        # [Etapa 4: Coleta de Dados (Cache Miss ou Inválido)]
-        print(f"INFO: Gerando dashboard para {perfil} {user_id} a partir do BANCO DE DADOS.")
+        # --- [Etapa 4: Coleta de Dados (Banco de Dados)] ---
+        print(f"INFO: Gerando dashboard via BANCO para {cache_key}.")
         kpis = {}
         dados_extras = {}
         labels_grafico = []
         datasets_grafico = []
 
-        hoje = datetime.now()
-        ano_atual = hoje.year
-        mes_atual = hoje.month
-
         # --- LÓGICA FORK: ADMINISTRADOR ---
         if perfil == 'Administrador':
-            params_mes = (ano_atual, mes_atual)
+            # KPIs Globais (Respeitando o filtro de data para o Total)
+            kpis['total_atividades'] = db.execute_query(
+                "SELECT COUNT(id) AS total FROM atividades WHERE DATE(data_atendimento) BETWEEN %s AND %s",
+                (data_inicio, data_fim), fetch='one')['total']
 
-            # KPIs Globais
-            kpis['total_atividades'] = db.execute_query("SELECT COUNT(id) AS total FROM atividades", fetch='one')[
-                'total']
-            kpis['atividades_hoje'] = \
-            db.execute_query("SELECT COUNT(id) AS total FROM atividades WHERE DATE(data_atendimento) = CURDATE()",
-                             fetch='one')['total']
-            kpis['total_colaboradores'] = \
-            db.execute_query("SELECT COUNT(id) AS total FROM colaboradores WHERE status = 'Ativo'", fetch='one')[
-                'total']
+            # Atividades "Hoje" continua sendo HOJE (independente do filtro, pois é um KPI de tempo real)
+            kpis['atividades_hoje'] = db.execute_query(
+                "SELECT COUNT(id) AS total FROM atividades WHERE DATE(data_atendimento) = CURDATE()",
+                fetch='one')['total']
 
-            # Rankings Globais (Mês Atual)
-            query_setor_top_mes = "SELECT s.nome_setor, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN setores s ON c.setor_id = s.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY s.nome_setor ORDER BY total_atividades DESC LIMIT 1;"
-            dados_extras['setor_mais_ativo'] = db.execute_query(query_setor_top_mes, params_mes, fetch='one')
+            kpis['total_colaboradores'] = db.execute_query(
+                "SELECT COUNT(id) AS total FROM colaboradores WHERE status = 'Ativo'",
+                fetch='one')['total']
+
+            # Ranking Setor (Com Filtro de Data)
+            query_setor_top = """
+                SELECT s.nome_setor, COUNT(a.id) AS total_atividades 
+                FROM atividades a 
+                JOIN colaboradores c ON a.colaborador_id = c.id 
+                JOIN setores s ON c.setor_id = s.id 
+                WHERE DATE(a.data_atendimento) BETWEEN %s AND %s 
+                GROUP BY s.nome_setor 
+                ORDER BY total_atividades DESC LIMIT 1;
+            """
+            dados_extras['setor_mais_ativo'] = db.execute_query(query_setor_top, (data_inicio, data_fim), fetch='one')
 
             # Listas Globais
             query_colab_setor = "SELECT s.id, s.nome_setor, COUNT(c.id) AS total_colaboradores FROM colaboradores c JOIN setores s ON c.setor_id = s.id WHERE c.status = 'Ativo' GROUP BY s.id, s.nome_setor ORDER BY total_colaboradores DESC;"
             dados_extras['colaboradores_por_setor'] = db.execute_query(query_colab_setor, fetch='all')
-            query_top_atividades_mes = "SELECT ta.nome, COUNT(a.id) AS total FROM atividades a JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s GROUP BY ta.id, ta.nome ORDER BY total DESC LIMIT 3;"
-            dados_extras['top_atividades'] = db.execute_query(query_top_atividades_mes, params_mes, fetch='all')
 
-            # Dados do Gráfico (Global, por Setor)
-            query_grafico = "SELECT DATE(a.data_atendimento) as dia, s.nome_setor, COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id JOIN setores s ON c.setor_id = s.id WHERE a.data_atendimento >= CURDATE() - INTERVAL 6 DAY GROUP BY dia, s.nome_setor ORDER BY dia ASC, s.nome_setor ASC;"
-            dados_brutos_grafico = db.execute_query(query_grafico, fetch='all')
+            query_top_atividades = """
+                SELECT ta.nome, COUNT(a.id) AS total 
+                FROM atividades a 
+                JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id 
+                WHERE DATE(a.data_atendimento) BETWEEN %s AND %s 
+                GROUP BY ta.id, ta.nome 
+                ORDER BY total DESC LIMIT 3;
+            """
+            dados_extras['top_atividades'] = db.execute_query(query_top_atividades, (data_inicio, data_fim),
+                                                              fetch='all')
+
+            # GRÁFICO ADMIN (Dinâmico)
+            query_grafico = """
+                SELECT DATE(a.data_atendimento) as dia, s.nome_setor, COUNT(a.id) as total 
+                FROM atividades a 
+                JOIN colaboradores c ON a.colaborador_id = c.id 
+                JOIN setores s ON c.setor_id = s.id 
+                WHERE DATE(a.data_atendimento) BETWEEN %s AND %s 
+                GROUP BY dia, s.nome_setor 
+                ORDER BY dia ASC, s.nome_setor ASC;
+            """
+            dados_brutos_grafico = db.execute_query(query_grafico, (data_inicio, data_fim), fetch='all')
+
+            # Processamento do Gráfico Admin
             if dados_brutos_grafico:
-                # Lógica de pivoteamento dos dados para o Chart.js
-                labels_grafico = sorted(list(set([d['dia'].strftime('%d/%m') for d in dados_brutos_grafico])))
+                # Gera eixo X baseado no intervalo selecionado
+                dt_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+                dt_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+                delta_days = (dt_fim - dt_inicio).days
+
+                # Labels garantem que todos os dias apareçam, mesmo sem dados
+                labels_grafico = [(dt_inicio + timedelta(days=i)).strftime('%d/%m') for i in range(delta_days + 1)]
+
                 setores = sorted(list(set([d['nome_setor'] for d in dados_brutos_grafico])))
                 dados_por_setor = {setor: [0] * len(labels_grafico) for setor in setores}
+
                 for dado in dados_brutos_grafico:
-                    label_index = labels_grafico.index(dado['dia'].strftime('%d/%m'))
-                    dados_por_setor[dado['nome_setor']][label_index] = dado['total']
+                    dia_str = dado['dia'].strftime('%d/%m')
+                    if dia_str in labels_grafico:
+                        idx = labels_grafico.index(dia_str)
+                        dados_por_setor[dado['nome_setor']][idx] = dado['total']
+
                 cores = ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)',
                          'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)']
+
                 for i, setor in enumerate(setores):
-                    datasets_grafico.append(
-                        {'label': setor, 'data': dados_por_setor[setor], 'backgroundColor': cores[i % len(cores)]})
+                    datasets_grafico.append({
+                        'label': setor,
+                        'data': dados_por_setor[setor],
+                        'backgroundColor': cores[i % len(cores)]
+                    })
 
         # --- LÓGICA FORK: GESTOR ---
         elif perfil == 'Gestor':
@@ -1076,78 +1129,113 @@ def dashboard():
                 dados_extras['setor_id_gestor'] = setor_id
                 dados_extras['setor_nome_gestor'] = setor_gestor['nome_setor']
 
-                # KPIs Específicos do Setor
+                # KPIs do Setor (Com Filtro de Data)
                 kpis['total_atividades_setor'] = db.execute_query(
-                    "SELECT COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s",
-                    (setor_id,), fetch='one')['total']
+                    """SELECT COUNT(a.id) as total FROM atividades a 
+                       JOIN colaboradores c ON a.colaborador_id = c.id 
+                       WHERE c.setor_id = %s AND DATE(a.data_atendimento) BETWEEN %s AND %s""",
+                    (setor_id, data_inicio, data_fim), fetch='one')['total']
+
+                # Atividades "Hoje" mantém tempo real
                 kpis['atividades_hoje_setor'] = db.execute_query(
-                    "SELECT COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND DATE(a.data_atendimento) = CURDATE()",
+                    """SELECT COUNT(a.id) as total FROM atividades a 
+                       JOIN colaboradores c ON a.colaborador_id = c.id 
+                       WHERE c.setor_id = %s AND DATE(a.data_atendimento) = CURDATE()""",
                     (setor_id,), fetch='one')['total']
-                kpis['total_colaboradores_setor'] = \
-                db.execute_query("SELECT COUNT(id) as total FROM colaboradores WHERE setor_id = %s AND status='Ativo'",
-                                 (setor_id,), fetch='one')['total']
 
-                # Chama a função auxiliar para buscar os rankings do setor
-                dados_extras.update(get_dados_extras_setor(db, setor_id))
+                kpis['total_colaboradores_setor'] = db.execute_query(
+                    "SELECT COUNT(id) as total FROM colaboradores WHERE setor_id = %s AND status='Ativo'",
+                    (setor_id,), fetch='one')['total']
 
-                # Dados do Gráfico (Específico do Setor, por Colaborador)
-                query_grafico = "SELECT DATE(a.data_atendimento) as dia, c.nome as colaborador, COUNT(a.id) as total FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE c.setor_id = %s AND a.data_atendimento >= CURDATE() - INTERVAL 6 DAY GROUP BY dia, colaborador ORDER BY dia ASC, colaborador ASC;"
-                dados_brutos_grafico = db.execute_query(query_grafico, (setor_id,), fetch='all')
+                # OBS: A função get_dados_extras_setor() é externa.
+                # Se ela usar queries fixas de mês, ela pode não obedecer o filtro.
+                if 'get_dados_extras_setor' in globals():
+                    dados_extras.update(get_dados_extras_setor(db, setor_id))
+
+                # GRÁFICO GESTOR (Dinâmico)
+                query_grafico = """
+                    SELECT DATE(a.data_atendimento) as dia, c.nome as colaborador, COUNT(a.id) as total 
+                    FROM atividades a 
+                    JOIN colaboradores c ON a.colaborador_id = c.id 
+                    WHERE c.setor_id = %s AND DATE(a.data_atendimento) BETWEEN %s AND %s 
+                    GROUP BY dia, colaborador 
+                    ORDER BY dia ASC, colaborador ASC;
+                """
+                dados_brutos_grafico = db.execute_query(query_grafico, (setor_id, data_inicio, data_fim), fetch='all')
+
+                # Processamento do Gráfico Gestor
                 if dados_brutos_grafico:
-                    # Lógica de pivoteamento dos dados para o Chart.js
-                    labels_grafico = sorted(list(set([d['dia'].strftime('%d/%m') for d in dados_brutos_grafico])))
+                    dt_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+                    dt_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+                    delta_days = (dt_fim - dt_inicio).days
+
+                    labels_grafico = [(dt_inicio + timedelta(days=i)).strftime('%d/%m') for i in range(delta_days + 1)]
+
                     colaboradores = sorted(list(set([d['colaborador'] for d in dados_brutos_grafico])))
-                    dados_por_colaborador = {colab: [0] * len(labels_grafico) for colab in colaboradores}
+                    dados_por_colab = {colab: [0] * len(labels_grafico) for colab in colaboradores}
+
                     for dado in dados_brutos_grafico:
-                        label_index = labels_grafico.index(dado['dia'].strftime('%d/%m'))
-                        dados_por_colaborador[dado['colaborador']][label_index] = dado['total']
+                        dia_str = dado['dia'].strftime('%d/%m')
+                        if dia_str in labels_grafico:
+                            idx = labels_grafico.index(dia_str)
+                            dados_por_colab[dado['colaborador']][idx] = dado['total']
+
                     cores = ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)',
                              'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)']
+
                     for i, colaborador in enumerate(colaboradores):
-                        datasets_grafico.append({'label': colaborador, 'data': dados_por_colaborador[colaborador],
-                                                 'backgroundColor': cores[i % len(cores)]})
+                        datasets_grafico.append({
+                            'label': colaborador,
+                            'data': dados_por_colab[colaborador],
+                            'backgroundColor': cores[i % len(cores)]
+                        })
             else:
-                # Caso de borda: Gestor sem setor associado
                 kpis.update({'total_atividades_setor': 0, 'atividades_hoje_setor': 0, 'total_colaboradores_setor': 0})
                 dados_extras['setor_nome_gestor'] = "Nenhum Setor"
 
-        # [Etapa 5: Consultas de Refinamento (Comum)]
-        # Estas queries rodam para ambos (Admin e Gestor), mas se adaptam.
+        # --- [Etapa 5: Consultas de Refinamento (Comum)] ---
 
-        # Query: Top 5 Colaboradores do Mês (Global ou do Setor)
-        query_base_top_colab_mes = "SELECT c.id, c.nome, COUNT(a.id) AS total_atividades FROM atividades a JOIN colaboradores c ON a.colaborador_id = c.id WHERE YEAR(a.data_atendimento) = %s AND MONTH(a.data_atendimento) = %s"
-        params_top_colab_mes = [ano_atual, mes_atual]
+        # Top 5 Colaboradores (Agora obedece o filtro de data)
+        query_base_top_colab = """
+            SELECT c.id, c.nome, COUNT(a.id) AS total_atividades 
+            FROM atividades a 
+            JOIN colaboradores c ON a.colaborador_id = c.id 
+            WHERE DATE(a.data_atendimento) BETWEEN %s AND %s
+        """
+        params_top_colab = [data_inicio, data_fim]
+
         if perfil == 'Gestor' and 'setor_id' in locals() and setor_id:
-            # Adiciona o filtro de setor dinamicamente se for Gestor
-            query_base_top_colab_mes += " AND c.setor_id = %s"
-            params_top_colab_mes.append(setor_id)
-        query_base_top_colab_mes += " GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 5;"
-        dados_extras['top_colaboradores_mes'] = db.execute_query(query_base_top_colab_mes, tuple(params_top_colab_mes),
+            query_base_top_colab += " AND c.setor_id = %s"
+            params_top_colab.append(setor_id)
+
+        query_base_top_colab += " GROUP BY c.id, c.nome ORDER BY total_atividades DESC LIMIT 5;"
+        dados_extras['top_colaboradores_mes'] = db.execute_query(query_base_top_colab, tuple(params_top_colab),
                                                                  fetch='all')
 
-        # Formata o mês de referência para exibição
-        meses_em_portugues = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro",
-                              "Outubro", "Novembro", "Dezembro"]
-        nome_mes_pt = meses_em_portugues[hoje.month - 1]
-        dados_extras['mes_referencia'] = f"{nome_mes_pt} de {hoje.year}"
+        # Texto do período para exibição
+        try:
+            dt_inicio_fmt = datetime.strptime(data_inicio, '%Y-%m-%d').strftime('%d/%m/%Y')
+            dt_fim_fmt = datetime.strptime(data_fim, '%Y-%m-%d').strftime('%d/%m/%Y')
+            dados_extras['mes_referencia'] = f"De {dt_inicio_fmt} até {dt_fim_fmt}"
+        except:
+            dados_extras['mes_referencia'] = "Período Selecionado"
 
-        # [Etapa 6: Armazenamento em Cache]
+        # --- [Etapa 6: Salvar no Cache] ---
         template_data = {
             'kpis': kpis,
             'dados_extras': dados_extras,
             'labels_grafico': labels_grafico,
-            'datasets_grafico': datasets_grafico
+            'datasets_grafico': datasets_grafico,
+            'filtros': filtros  # Importante para o HTML não esquecer a data
         }
 
-        # Salva os dados no cache apenas se não for uma personificação
         if not is_impersonating:
             if perfil == 'Gestor':
                 dashboard_cache['Gestor'][cache_key] = {'data': template_data, 'last_updated': now}
             else:
                 dashboard_cache[perfil] = {'data': template_data, 'last_updated': now}
 
-    # [Etapa 7: Preparação Final e Saída]
-    # Busca a lista de gestores para o dropdown de personificação (apenas para Admins)
+    # --- [Etapa 7: Preparação Final e Saída] ---
     gestores_disponiveis = []
     if perfil_original == 'Administrador':
         query_gestores = "SELECT c.id, c.nome, s.nome_setor as setor FROM colaboradores c JOIN perfis p ON c.perfil_id = p.id LEFT JOIN setores s ON c.setor_id = s.id WHERE p.nome = 'Gestor' AND c.status = 'Ativo' ORDER BY c.nome;"
@@ -1156,7 +1244,10 @@ def dashboard():
     template_data['gestores_disponiveis'] = gestores_disponiveis
     template_data['is_impersonating'] = is_impersonating
 
-    # Renderiza o template, passando o dicionário de dados descompactado (**)
+    # Garante que 'filtros' esteja no template_data mesmo vindo do cache
+    if 'filtros' not in template_data:
+        template_data['filtros'] = filtros
+
     return render_template('dashboard.html', **template_data)
 
 
@@ -1268,6 +1359,68 @@ def inject_user_medals():
 
     # O dicionário retornado é mesclado ao contexto do template globalmente.
     return medals_data
+
+
+@app.route('/api/atividades-hoje-setor')
+@login_required
+def api_atividades_hoje_setor():
+    """
+    API que retorna os dados para o modal.
+    - Administrador/Coordenador: Vê todos os setores.
+    - Gestor: Vê APENAS o seu próprio setor.
+    """
+    try:
+        # 1. Pegamos os dados de quem está logado
+        usuario_id = session.get('colaborador_id')
+        perfil_usuario = session.get('colaborador_perfil')
+
+        # 2. Montamos a Query Base (O início é igual para todos)
+        base_query = """
+            SELECT 
+                s.id, 
+                s.nome_setor, 
+                COUNT(a.id) as total
+            FROM atividades a
+            JOIN colaboradores c ON a.colaborador_id = c.id
+            JOIN setores s ON c.setor_id = s.id
+            WHERE DATE(a.data_atendimento) = CURDATE()
+        """
+
+        params = []
+
+        # 3. Aplicamos o Filtro de Segurança baseado no Perfil
+        if perfil_usuario == 'Gestor':
+            # Se for Gestor, adicionamos uma trava:
+            # "Onde o setor ID seja igual ao setor deste usuário"
+            # Usamos uma subquery simples para pegar o setor do usuário logado
+            base_query += " AND s.id = (SELECT setor_id FROM colaboradores WHERE id = %s) "
+            params.append(usuario_id)
+
+        elif perfil_usuario in ['Administrador', 'Coordenador']:
+            # Se for Admin ou Coordenador, não fazemos nada extra.
+            # Eles podem ver tudo.
+            pass
+
+        else:
+            # Se for um perfil desconhecido (ex: Colaborador comum tentando acessar via URL)
+            # Retorna vazio por segurança
+            return jsonify([])
+
+        # 4. Finalizamos a Query (Agrupamento e Ordem)
+        base_query += """
+            GROUP BY s.id, s.nome_setor
+            ORDER BY total DESC
+        """
+
+        # 5. Executamos
+        # Note que passamos 'params' (que pode ter o ID do gestor ou estar vazio)
+        dados = db.execute_query(base_query, tuple(params), fetch='all')
+
+        return jsonify(dados)
+
+    except Exception as e:
+        print(f"❌ Erro na API de Segurança: {e}")
+        return jsonify({'error': 'Erro interno ao buscar dados'}), 500
 
 
 # =============================================================================
@@ -1455,6 +1608,8 @@ def crm_buscar_cliente_por_identificador(identificador):
     else:
         return jsonify(None), 404 # Retorna "Não encontrado"
 
+
+
 @app.route('/crm/fila')
 @login_required
 def crm_fila_atendimento():
@@ -1484,10 +1639,10 @@ def crm_fila_atendimento():
     where_clauses = []
     params = []
 
-    # [3.1] Filtro de Permissão (Data Scoping) - (COM A LÓGICA DE FILA DE SETOR)
+    # [3.1] Filtro de Permissão (Data Scoping)
     user_id = session['colaborador_id']
     user_profile = session['colaborador_perfil']
-    user_setor_id = session['colaborador_setor_id']  # Pega o setor do colaborador logado
+    user_setor_id = session['colaborador_setor_id']
 
     if user_profile == 'Colaborador':
         where_clauses.append("a.setor_responsavel_id = %s")
@@ -1557,9 +1712,6 @@ def crm_fila_atendimento():
     count_result = db.execute_query(count_query, tuple(params), fetch='one')
     total_records = count_result['total'] if count_result else 0
     total_pages = math.ceil(total_records / PER_PAGE) if total_records > 0 else 1
-
-    # [A CORREÇÃO ESTÁ AQUI (v1)]
-    # Adicionamos 'a.criado_em' na sua Query 2
     data_query = """
         SELECT 
             a.id, a.titulo, a.status_fila, 
@@ -1584,6 +1736,7 @@ def crm_fila_atendimento():
                            current_page=page,
                            total_pages=total_pages)
 
+
 @app.route('/crm/atendimento/<int:atendimento_id>', methods=['GET', 'POST'])
 @login_required
 def crm_detalhe_atendimento(atendimento_id):
@@ -1597,51 +1750,41 @@ def crm_detalhe_atendimento(atendimento_id):
     user_setor_id = session['colaborador_setor_id']
 
     # Pega o nome do colaborador logado para os logs
-    colaborador_nome = session.get('colaborador_nome', 'Usuário')  # Usar .get para segurança
+    colaborador_nome = session.get('colaborador_nome', 'Usuário')
 
     # =========================================================================
     # [1] LÓGICA DE AÇÕES (POST)
     # =========================================================================
     if request.method == 'POST':
         try:
-            # Dados do formulário
             acao = request.form.get('acao')
-
             if not acao:
                 raise Exception("Ação não especificada.")
 
-            # =================================================================
-            # [LÓGICA ATUALIZADA]
-            # =================================================================
-
-            # --- AÇÃO 1 (ATUALIZADA): Comentário e/ou Status Interno ---
+            # --- AÇÃO 1: Comentário e/ou Status Interno ---
             if acao == 'comentario':
-                # 1. Pegar os dados do formulário
                 descricao = request.form.get('descricao')
                 novo_status_interno = request.form.get('novo_status_interno')
 
-                # 2. Buscar o status interno atual (para comparar)
                 query_atual = "SELECT status_interno FROM atendimentos WHERE id = %s"
                 atendimento_atual = db.execute_query(query_atual, (atendimento_id,), fetch='one')
                 status_interno_antigo = atendimento_atual['status_interno']
 
-                # 3. Validar se algo foi feito
                 descricao_existe = bool(descricao)
                 status_mudou = novo_status_interno != status_interno_antigo
 
-                # Validação (esta é a única vez que retornamos cedo)
                 if not descricao_existe and not status_mudou:
-                    flash('Nenhuma alteração detectada (comentário vazio e status interno igual).', 'warning')
+                    flash('Nenhuma alteração detectada.', 'warning')
                     return redirect(url_for('crm_detalhe_atendimento', atendimento_id=atendimento_id))
 
-                # 4. Atualizar o Atendimento (Status Interno e Timestamp)
+                # Atualiza Status Interno
                 query_update_atendimento = """
                     UPDATE atendimentos SET status_interno = %s, ultima_atualizacao = %s WHERE id = %s
                 """
                 db.execute_query(query_update_atendimento, (novo_status_interno, datetime.now(), atendimento_id),
                                  fetch=None)
 
-                # 5. Adicionar o Comentário ao Histórico (se existir)
+                # Log Comentário
                 if descricao_existe:
                     query_historico = """
                         INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao)
@@ -1649,9 +1792,9 @@ def crm_detalhe_atendimento(atendimento_id):
                     """
                     db.execute_query(query_historico, (atendimento_id, colaborador_id, descricao), fetch=None)
 
-                # 6. Adicionar a Mudança de Status Interno ao Histórico (se mudou)
+                # Log Mudança Status
                 if status_mudou:
-                    log_status = f"[Status Interno alterado de '{status_interno_antigo}' para '{novo_status_interno}' por {colaborador_nome}."
+                    log_status = f"[Status Interno alterado de '{status_interno_antigo}' para '{novo_status_interno}' por {colaborador_nome}.]"
                     query_historico_status = """
                         INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao)
                         VALUES (%s, %s, 'Comentario', %s)
@@ -1660,67 +1803,44 @@ def crm_detalhe_atendimento(atendimento_id):
 
                 flash('Atendimento atualizado com sucesso!', 'success')
 
-            # --- AÇÃO 2 (NOVA): Comentar e Resolver (com PDS) ---
-            # [CORREÇÃO DE INDENTAÇÃO]
+            # --- AÇÃO 2: Comentar e Resolver (com PDS) ---
             elif acao == 'resolver':
-                # 1. Pegar os dados...
                 descricao = request.form.get('descricao')
                 gerar_pds_val = request.form.get('gerar_pds')
                 status_interno_final = 'Encerrado'
 
-                # 2. Lógica da PDS
                 pds_gerar_flag = 1 if gerar_pds_val == '1' else 0
                 pds_status_val = 'Pendente' if pds_gerar_flag == 1 else 'Nao Aplicavel'
 
-                # 3. Salvar históricos (comentário e resolução)
                 if descricao:
-                    query_hist_desc = """
-                        INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao) 
-                        VALUES (%s, %s, 'Comentario', %s)
-                    """
+                    query_hist_desc = "INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao) VALUES (%s, %s, 'Comentario', %s)"
                     db.execute_query(query_hist_desc, (atendimento_id, colaborador_id, descricao), fetch=None)
 
                 pds_log_msg = 'Sim' if pds_gerar_flag == 1 else 'Nao'
                 hist_msg_res = f"[ATENDIMENTO RESOLVIDO] {colaborador_nome} resolveu o ticket. Gerar PDS: {pds_log_msg}."
-                query_hist_res = """
-                    INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao) 
-                    VALUES (%s, %s, 'Comentario', %s)
-                """
+                query_hist_res = "INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao) VALUES (%s, %s, 'Comentario', %s)"
                 db.execute_query(query_hist_res, (atendimento_id, colaborador_id, hist_msg_res), fetch=None)
 
-                # 4. Atualizar o Atendimento (A Query Mestra)
                 query_resolver = """
                     UPDATE atendimentos
-                    SET 
-                        status_fila = 'Resolvido', 
-                        status_interno = %s,
-                        pds_gerar = %s,
-                        pds_status = %s,
-                        ultima_atualizacao = %s
+                    SET status_fila = 'Resolvido', status_interno = %s, pds_gerar = %s, pds_status = %s, ultima_atualizacao = %s
                     WHERE id = %s
                 """
                 db.execute_query(query_resolver,
                                  (status_interno_final, pds_gerar_flag, pds_status_val, datetime.now(), atendimento_id),
                                  fetch=None)
 
-                # 5. [MUDANÇA] Criar a entrada na tabela 'pesquisas_satisfacao'
                 if pds_gerar_flag == 1:
                     novo_token = str(uuid.uuid4())
-                    query_criar_pds = """
-                        INSERT INTO pesquisas_satisfacao (atendimento_id, token, status, criado_em)
-                        VALUES (%s, %s, 'Pendente', %s)
-                    """
+                    query_criar_pds = "INSERT INTO pesquisas_satisfacao (atendimento_id, token, status, criado_em) VALUES (%s, %s, 'Pendente', %s)"
                     db.execute_query(query_criar_pds, (atendimento_id, novo_token, datetime.now()), fetch=None)
-                    # (No futuro, é aqui que o sistema enviará o e-mail)
 
                 flash('Atendimento resolvido com sucesso!', 'success')
 
-            # --- AÇÃO 3 (Antiga Ação 2): Mudar Status (Macro) ---
-            # [CORREÇÃO DE INDENTAÇÃO]
+            # --- AÇÃO 3: Mudar Status (Macro) ---
             elif acao == 'mudar_status':
                 novo_status = request.form.get('novo_status')
-                if not novo_status:
-                    raise Exception("Novo status não foi selecionado.")
+                if not novo_status: raise Exception("Novo status não foi selecionado.")
 
                 query_status_atual = "SELECT status_fila FROM atendimentos WHERE id = %s"
                 atendimento_atual = db.execute_query(query_status_atual, (atendimento_id,), fetch='one')
@@ -1730,59 +1850,31 @@ def crm_detalhe_atendimento(atendimento_id):
                     flash('O atendimento já está com este status.', 'warning')
                     return redirect(url_for('crm_detalhe_atendimento', atendimento_id=atendimento_id))
 
-                # [SUA LÓGICA DE GATILHO - ATUALIZADA]
                 if novo_status in ['Resolvido', 'Fechado', 'Cancelado']:
-
-                    # [MUDANÇA] Gerar token e atualizar 'atendimentos'
                     novo_token = str(uuid.uuid4())
-
                     query_update_status = """
                         UPDATE atendimentos
-                        SET status_fila = %s, 
-                            status_interno = 'Encerrado', 
-                            pds_status = 'Pendente',
-                            pds_gerar = 1, -- (Assume PDS = Sim)
-                            ultima_atualizacao = %s
+                        SET status_fila = %s, status_interno = 'Encerrado', pds_status = 'Pendente', pds_gerar = 1, ultima_atualizacao = %s
                         WHERE id = %s
                     """
                     db.execute_query(query_update_status, (novo_status, datetime.now(), atendimento_id), fetch=None)
 
-                    # [MUDANÇA] Criar a entrada na 'pesquisas_satisfacao'
-                    query_criar_pds = """
-                        INSERT INTO pesquisas_satisfacao (atendimento_id, token, status, criado_em)
-                        VALUES (%s, %s, 'Pendente', %s)
-                    """
+                    query_criar_pds = "INSERT INTO pesquisas_satisfacao (atendimento_id, token, status, criado_em) VALUES (%s, %s, 'Pendente', %s)"
                     db.execute_query(query_criar_pds, (atendimento_id, novo_token, datetime.now()), fetch=None)
-                    # (Aqui também dispararia o e-mail)
-
                 else:
-                    # Mudar SÓ o status_fila (Macro)
-                    query_update_status = """
-                        UPDATE atendimentos
-                        SET status_fila = %s, ultima_atualizacao = %s
-                        WHERE id = %s
-                    """
+                    query_update_status = "UPDATE atendimentos SET status_fila = %s, ultima_atualizacao = %s WHERE id = %s"
                     db.execute_query(query_update_status, (novo_status, datetime.now(), atendimento_id), fetch=None)
 
-                # O log do histórico continua o mesmo
                 descricao_log = f"[MUDANÇA DE STATUS] Status alterado de '{status_antigo}' para '{novo_status}' por {colaborador_nome}."
-                query_historico_status = """
-                    INSERT INTO atendimento_historico
-                    (atendimento_id, colaborador_id, tipo_acao, descricao)
-                    VALUES (%s, %s, 'Comentario', %s) 
-                """
-                params_historico = (atendimento_id, colaborador_id, descricao_log)
-                db.execute_query(query_historico_status, params_historico, fetch=None)
+                query_historico_status = "INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao) VALUES (%s, %s, 'Comentario', %s)"
+                db.execute_query(query_historico_status, (atendimento_id, colaborador_id, descricao_log), fetch=None)
 
                 flash(f'Status atualizado para "{novo_status}" com sucesso!', 'success')
 
-
-            # --- AÇÃO 4 (Antiga Ação 3): Encaminhar (Mudar de Setor) ---
-            # [CORREÇÃO DE INDENTAÇÃO]
+            # --- AÇÃO 4: Encaminhar ---
             elif acao == 'encaminhar':
                 novo_setor_id = request.form.get('encaminhar_setor')
-                if not novo_setor_id:
-                    raise Exception("Nenhum setor de destino foi selecionado.")
+                if not novo_setor_id: raise Exception("Nenhum setor de destino selecionado.")
 
                 query_setor_novo = "SELECT nome_setor FROM setores WHERE id = %s"
                 setor_novo_obj = db.execute_query(query_setor_novo, (novo_setor_id,), fetch='one')
@@ -1794,36 +1886,27 @@ def crm_detalhe_atendimento(atendimento_id):
 
                 query_update_encaminhar = """
                     UPDATE atendimentos
-                    SET 
-                        status_fila = 'Em fila',
-                        setor_responsavel_id = %s,
-                        responsavel_id = criador_id, 
-                        ultima_atualizacao = %s
+                    SET status_fila = 'Em fila', sector_responsavel_id = %s, responsavel_id = criador_id, ultima_atualizacao = %s
                     WHERE id = %s
                 """
+                # OBS: Ajustei sector_responsavel_id para setor_responsavel_id caso seja erro de digitação
+                query_update_encaminhar = query_update_encaminhar.replace("sector_responsavel_id",
+                                                                          "setor_responsavel_id")
+
                 db.execute_query(query_update_encaminhar, (novo_setor_id, datetime.now(), atendimento_id), fetch=None)
 
                 descricao_log = f"[ENCAMINHADO] {colaborador_nome} encaminhou o atendimento do setor '{setor_antigo_nome}' para '{novo_setor_nome}'."
-                query_historico_encaminhar = """
-                    INSERT INTO atendimento_historico
-                    (atendimento_id, colaborador_id, tipo_acao, descricao)
-                    VALUES (%s, %s, 'Comentario', %s)
-                """
-                params_historico = (atendimento_id, colaborador_id, descricao_log)
-                db.execute_query(query_historico_encaminhar, params_historico, fetch=None)
+                query_historico_encaminhar = "INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao) VALUES (%s, %s, 'Comentario', %s)"
+                db.execute_query(query_historico_encaminhar, (atendimento_id, colaborador_id, descricao_log),
+                                 fetch=None)
 
-                flash(f'Atendimento encaminhado para "{novo_setor_nome}" e movido para "Em fila"!', 'success')
-
-                # Este é o único return que deve ficar aqui, pois muda a tela
+                flash(f'Atendimento encaminhado para "{novo_setor_nome}"!', 'success')
                 return redirect(url_for('crm_fila_atendimento'))
 
-            # --- AÇÃO 5 (Antiga Ação 4): Mudar Responsável (Dentro do Setor) ---
-            # [CORREÇÃO DE INDENTAÇÃO]
+            # --- AÇÃO 5: Mudar Responsável ---
             elif acao == 'mudar_responsavel':
                 novo_responsavel_id = request.form.get('novo_responsavel')
-
-                if not novo_responsavel_id:
-                    raise Exception("Nenhum novo responsável foi selecionado.")
+                if not novo_responsavel_id: raise Exception("Nenhum novo responsável selecionado.")
 
                 query_resp_antigo = "SELECT c.nome FROM atendimentos a JOIN colaboradores c ON a.responsavel_id = c.id WHERE a.id = %s"
                 resp_antigo_obj = db.execute_query(query_resp_antigo, (atendimento_id,), fetch='one')
@@ -1833,62 +1916,37 @@ def crm_detalhe_atendimento(atendimento_id):
                 resp_novo_obj = db.execute_query(query_resp_novo, (novo_responsavel_id,), fetch='one')
                 resp_novo_nome = resp_novo_obj['nome'] if resp_novo_obj else "Desconhecido"
 
-                query_update_responsavel = """
-                    UPDATE atendimentos
-                    SET 
-                        responsavel_id = %s,
-                        ultima_atualizacao = %s
-                    WHERE id = %s
-                """
+                query_update_responsavel = "UPDATE atendimentos SET responsavel_id = %s, ultima_atualizacao = %s WHERE id = %s"
                 db.execute_query(query_update_responsavel, (novo_responsavel_id, datetime.now(), atendimento_id),
                                  fetch=None)
 
                 descricao_log = f"[RE-ATRIBUÍDO] {colaborador_nome} mudou o responsável de '{resp_antigo_nome}' para '{resp_novo_nome}'."
-                query_historico_reatribuir = """
-                    INSERT INTO atendimento_historico
-                    (atendimento_id, colaborador_id, tipo_acao, descricao)
-                    VALUES (%s, %s, 'Comentario', %s)
-                """
-                params_historico = (atendimento_id, colaborador_id, descricao_log)
-                db.execute_query(query_historico_reatribuir, params_historico, fetch=None)
+                query_historico_reatribuir = "INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao) VALUES (%s, %s, 'Comentario', %s)"
+                db.execute_query(query_historico_reatribuir, (atendimento_id, colaborador_id, descricao_log),
+                                 fetch=None)
 
                 flash(f'Atendimento reatribuído para {resp_novo_nome} com sucesso!', 'success')
 
-            # --- AÇÃO 6 (Antiga Ação 5): Assumir Atendimento ---
-            # [CORREÇÃO DE INDENTAÇÃO]
+            # --- AÇÃO 6: Assumir ---
             elif acao == 'assumir':
-                query_update_assumir = """
-                    UPDATE atendimentos
-                    SET 
-                        status_fila = 'Em atendimento',
-                        responsavel_id = %s,
-                        ultima_atualizacao = %s
-                    WHERE id = %s
-                """
+                query_update_assumir = "UPDATE atendimentos SET status_fila = 'Em atendimento', responsavel_id = %s, ultima_atualizacao = %s WHERE id = %s"
                 db.execute_query(query_update_assumir, (colaborador_id, datetime.now(), atendimento_id), fetch=None)
 
                 descricao_log = f"[ASSUMIU] {colaborador_nome} assumiu este atendimento."
-                query_historico_assumir = """
-                    INSERT INTO atendimento_historico
-                    (atendimento_id, colaborador_id, tipo_acao, descricao)
-                    VALUES (%s, %s, 'Comentario', %s)
-                """
-                params_historico = (atendimento_id, colaborador_id, descricao_log)
-                db.execute_query(query_historico_assumir, params_historico, fetch=None)
+                query_historico_assumir = "INSERT INTO atendimento_historico (atendimento_id, colaborador_id, tipo_acao, descricao) VALUES (%s, %s, 'Comentario', %s)"
+                db.execute_query(query_historico_assumir, (atendimento_id, colaborador_id, descricao_log), fetch=None)
 
-                flash('Você assumiu este atendimento! Agora ele está "Em atendimento".', 'success')
+                flash('Você assumiu este atendimento!', 'success')
 
         except Exception as e:
             flash(f'Erro ao processar a ação: {e}', 'danger')
 
-        # Recarrega a página para mostrar as mudanças (O REDIRECT GERAL)
         return redirect(url_for('crm_detalhe_atendimento', atendimento_id=atendimento_id))
 
     # =========================================================================
-    # [2] LÓGICA DE EXIBIÇÃO (GET) - (Seu código original, intacto)
+    # [2] LÓGICA DE EXIBIÇÃO (GET)
     # =========================================================================
 
-    # Query 1: Buscar a "Capa" do Atendimento
     query_atendimento = """
         SELECT 
             a.*,
@@ -1915,7 +1973,7 @@ def crm_detalhe_atendimento(atendimento_id):
         flash('Atendimento não encontrado.', 'danger')
         return redirect(url_for('crm_fila_atendimento'))
 
-    # [2.1] Verificação de Permissão (Segurança)
+    # Permissões
     pode_ver = False
     if user_profile == 'Administrador':
         pode_ver = True
@@ -1924,21 +1982,17 @@ def crm_detalhe_atendimento(atendimento_id):
         setores_do_gestor_raw = db.execute_query(query_setores_gestor, (colaborador_id,), fetch='all')
         setores_visiveis = {s['id'] for s in setores_do_gestor_raw}
         setores_visiveis.add(user_setor_id)
-        if atendimento['setor_responsavel_id'] in setores_visiveis:
-            pode_ver = True
+        if atendimento['setor_responsavel_id'] in setores_visiveis: pode_ver = True
     elif user_profile == 'Colaborador':
-        if atendimento['setor_responsavel_id'] == user_setor_id:
-            pode_ver = True
+        if atendimento['setor_responsavel_id'] == user_setor_id: pode_ver = True
 
     if not pode_ver:
         flash('Você não tem permissão para ver este atendimento.', 'danger')
         return redirect(url_for('crm_fila_atendimento'))
 
-    # Query 2: Buscar a "Linha do Tempo" (Histórico)
+    # Histórico
     query_historico = """
-        SELECT 
-            h.*,
-            c.nome AS colaborador_nome
+        SELECT h.*, c.nome AS colaborador_nome
         FROM atendimento_historico h
         JOIN colaboradores c ON h.colaborador_id = c.id
         WHERE h.atendimento_id = %s
@@ -1946,32 +2000,29 @@ def crm_detalhe_atendimento(atendimento_id):
     """
     historico = db.execute_query(query_historico, (atendimento_id,), fetch='all') or []
 
-    # Query 3: Buscar dados para os formulários de Ação
+    # Listas para formulários
     lista_setores = db.execute_query("SELECT id, nome_setor FROM setores ORDER BY nome_setor", fetch='all') or []
     lista_colaboradores_setor = db.execute_query(
         "SELECT id, nome FROM colaboradores WHERE setor_id = %s AND status = 'Ativo' ORDER BY nome",
-        (atendimento['setor_responsavel_id'],),
-        fetch='all'
+        (atendimento['setor_responsavel_id'],), fetch='all'
     ) or []
 
-    # Inicializamos pds_info como None FORA do 'if'
-
     pds_info = None
-    # Só busca se o atendimento estiver encerrado e a PDS foi gerada
-    if atendimento['status_fila'] in ['Resolvido', 'Fechado', 'Cancelado'] and atendimento['pds_gerar'] == 1:
-        query_pds = "SELECT token, status FROM pesquisas_satisfacao WHERE atendimento_id = %s LIMIT 1"
+    if atendimento['pds_gerar'] == 1:
+        query_pds = """
+            SELECT token, status, q1_demanda_atendida, q2_nota_atendimento 
+            FROM pesquisas_satisfacao 
+            WHERE atendimento_id = %s 
+            LIMIT 1
+        """
         pds_info = db.execute_query(query_pds, (atendimento_id,), fetch='one')
 
-    # [3] Renderização
-    # (Este return agora recebe 'pds_info' que SEMPRE existe)
     return render_template('crm_detalhe_atendimento.html',
                            atendimento=atendimento,
                            historico=historico,
                            lista_setores=lista_setores,
                            lista_colaboradores_setor=lista_colaboradores_setor,
                            pds_info=pds_info)
-
-
 # =============================================================================
 # [NOVA ROTA] Gestão de Grupos e Tipos de Cliente
 # =============================================================================
@@ -2111,37 +2162,73 @@ def admin_gestao_origens():
 def crm_historico_cliente():
     """
     Exibe a página de "Histórico do Cliente".
-    Permite buscar um cliente (por ID/RA/Polo ou nome) e ver todos
-    os seus atendimentos, com KPIs (duração, PDS).
+    Implementa lógica profissional de desambiguação:
+    1. Se achar 1 cliente -> Abre direto.
+    2. Se achar vários -> Mostra lista para escolha.
+    3. Se busca for ID exato -> Abre direto.
     """
 
-    # Pega os termos de busca da URL
+    # --- 1. Captura Parâmetros ---
     termo_busca = request.args.get('termo_busca', '').strip()
     filtro_setor_id = request.args.get('filtro_setor_id', '')
     data_inicio = request.args.get('data_inicio', '')
     data_fim = request.args.get('data_fim', '')
 
+    # Variáveis de Retorno
     cliente_encontrado = None
+    lista_clientes_ambiguos = []
     atendimentos_do_cliente = []
 
-    # Para passar a lista de todos os setores para o filtro HTML
+    # Lista de setores para o dropdown do filtro
     lista_setores_todos = db.execute_query("SELECT id, nome_setor FROM setores ORDER BY nome_setor", fetch='all') or []
 
-    if termo_busca:  # Só busca atendimentos se houver um termo para o cliente
+    if termo_busca:
         try:
-            # 1. Tenta buscar o cliente (por ID ou Nome)
-            query_cliente = """
-                SELECT id, nome, identificador_principal, email, telefone 
-                FROM clientes 
-                WHERE identificador_principal = %s OR nome LIKE %s
-                LIMIT 1 
-            """
-            termo_like = f"%{termo_busca}%"
-            cliente_encontrado = db.execute_query(query_cliente, (termo_busca, termo_like), fetch='one')
+            # --- 2. Estratégia de Busca Inteligente ---
 
+            candidatos = []
+
+            # A) Se o termo for numérico, tenta achar pelo ID exato primeiro (prioridade máxima)
+            # Isso serve para quando o usuário clica em "Selecionar" na lista de homônimos
+            if termo_busca.isdigit():
+                query_id = "SELECT id, nome, identificador_principal, email, telefone FROM clientes WHERE id = %s"
+                candidato_id = db.execute_query(query_id, (termo_busca,), fetch='one')
+                if candidato_id:
+                    candidatos = [candidato_id]  # Transforma em lista para usar a logica abaixo
+
+            # B) Se não achou por ID (ou não é número), busca por Nome ou Documento (Busca Ampla)
+            if not candidatos:
+                query_busca = """
+                    SELECT id, nome, identificador_principal, email, telefone 
+                    FROM clientes 
+                    WHERE identificador_principal = %s OR nome LIKE %s
+                    LIMIT 20 
+                """
+                # LIMIT 20 previne travar o banco se alguém buscar "a"
+                termo_like = f"%{termo_busca}%"
+                candidatos = db.execute_query(query_busca, (termo_busca, termo_like), fetch='all') or []
+
+            # --- 3. Tomada de Decisão (O "Cérebro" da Rota) ---
+
+            if len(candidatos) == 1:
+                # CENÁRIO PERFEITO: Só existe um cliente com esse dado.
+                cliente_encontrado = candidatos[0]
+
+            elif len(candidatos) > 1:
+                # CENÁRIO DE AMBIGUIDADE: Existem homônimos.
+                # Não carregamos histórico ainda. Enviamos a lista para o HTML.
+                lista_clientes_ambiguos = candidatos
+                flash(
+                    f'Encontramos {len(candidatos)} clientes com termos parecidos. Por favor, selecione o correto abaixo.',
+                    'warning')
+
+            else:
+                # CENÁRIO VAZIO
+                flash(f'Nenhum cliente encontrado para "{termo_busca}".', 'info')
+
+            # --- 4. Se temos UM cliente definido, carregamos o histórico ---
             if cliente_encontrado:
-                # 2. Se encontrou, busca TODOS os atendimentos desse cliente, aplicando filtros
-                query_atendimentos_sql = """
+                query_atendimentos = """
                     SELECT 
                         id, titulo, status_fila, status_interno, criado_em, ultima_atualizacao,
                         pds_gerar, pds_status,
@@ -2151,44 +2238,41 @@ def crm_historico_cliente():
                 """
                 params = [cliente_encontrado['id']]
 
-                # [NOVO] Aplica filtro por setor
+                # Filtros Opcionais
                 if filtro_setor_id:
-                    query_atendimentos_sql += " AND setor_responsavel_id = %s"
+                    query_atendimentos += " AND setor_responsavel_id = %s"
                     params.append(filtro_setor_id)
 
-                # [NOVO] Aplica filtro por data de início
                 if data_inicio:
-                    query_atendimentos_sql += " AND criado_em >= %s"
+                    query_atendimentos += " AND criado_em >= %s"
                     params.append(data_inicio)
 
-                # [NOVO] Aplica filtro por data de fim
                 if data_fim:
-                    # Adiciona 23:59:59 para incluir todo o dia selecionado
-                    data_fim_com_hora = f"{data_fim} 23:59:59"
-                    query_atendimentos_sql += " AND criado_em <= %s"
-                    params.append(data_fim_com_hora)
+                    query_atendimentos += " AND criado_em <= %s"
+                    params.append(f"{data_fim} 23:59:59")
 
-                query_atendimentos_sql += " ORDER BY criado_em DESC"
+                query_atendimentos += " ORDER BY criado_em DESC"
 
-                atendimentos_do_cliente = db.execute_query(query_atendimentos_sql, tuple(params), fetch='all') or []
+                atendimentos_do_cliente = db.execute_query(query_atendimentos, tuple(params), fetch='all') or []
 
                 if not atendimentos_do_cliente:
-                    flash('Cliente encontrado, mas nenhum atendimento registrado para ele com os filtros aplicados.',
-                          'info')
-            else:
-                flash(f'Nenhum cliente encontrado com o termo "{termo_busca}".', 'warning')
+                    flash('Cliente localizado, mas não há histórico de atendimentos com os filtros atuais.', 'info')
 
         except Exception as e:
-            flash(f'Erro ao buscar cliente ou atendimentos: {e}', 'danger')
+            print(f"Erro no CRM: {e}")  # Log no terminal para você ver
+            flash(f'Erro ao processar busca: {str(e)}', 'danger')
 
+    # --- 5. Renderização ---
     return render_template('crm_historico_cliente.html',
                            termo_busca=termo_busca,
                            filtro_setor_id=filtro_setor_id,
                            data_inicio=data_inicio,
                            data_fim=data_fim,
+                           lista_setores_todos=lista_setores_todos,
+                           # Passamos as variáveis cruciais:
                            cliente=cliente_encontrado,
                            atendimentos=atendimentos_do_cliente,
-                           lista_setores_todos=lista_setores_todos)
+                           lista_clientes_ambiguos=lista_clientes_ambiguos)
 
 
 # =============================================================================
@@ -2232,9 +2316,12 @@ def pds_responder(token):
             atendimento_id = pds['atendimento_id']
 
             # B. Pegar as 3 respostas do formulário
-            q1 = request.form.get('q1_demanda') == 'sim'  # Converte 'sim' para True/1
-            q2 = request.form.get('q2_nota_atendimento')
-            q3 = request.form.get('q3_nota_recomendacao')
+            q1 = request.form.get('q1')  # Agora virá 'Sim', 'Não' ou 'Parcialmente'
+            q2 = request.form.get('q2')
+
+            if not q1 or not q2:
+                flash('Por favor, responda todas as perguntas.', 'warning')
+                return render_template('pds_responder.html', atendimento=atendimento, token=token)
 
             # C. Salvar (UPDATE) na sua tabela 'pesquisas_satisfacao'
             query_update_pds = """
@@ -2242,12 +2329,11 @@ def pds_responder(token):
                 SET 
                     q1_demanda_atendida = %s,
                     q2_nota_atendimento = %s,
-                    q3_nota_recomendacao = %s,
                     status = 'Respondida',
                     data_resposta = %s
                 WHERE id = %s
             """
-            db.execute_query(query_update_pds, (q1, q2, q3, datetime.now(), pds_id), fetch=None)
+            db.execute_query(query_update_pds, (q1, q2, datetime.now(), pds_id), fetch=None)
 
             # D. Atualizar o 'atendimentos' para "Respondida" (para os filtros)
             query_update_atendimento = "UPDATE atendimentos SET pds_status = 'Respondida' WHERE id = %s"
@@ -2272,3 +2358,102 @@ def pds_obrigado():
     Página de "Obrigado" após a pesquisa.
     """
     return render_template('pds_obrigado.html')
+
+
+@app.route('/crm/clientes')
+@login_required
+def crm_lista_clientes():
+    """
+    Carteira de Clientes com Filtros Avançados (Cascata).
+    """
+    # 1. Captura Parâmetros
+    busca = request.args.get('busca', '').strip()
+    filtro_grupo = request.args.get('filtro_grupo', '')
+    filtro_tipo = request.args.get('filtro_tipo', '')
+
+    pagina = request.args.get('page', 1, type=int)
+    itens_por_pagina = 20
+    offset = (pagina - 1) * itens_por_pagina
+
+    # 2. Carregar listas para os Dropdowns
+    lista_grupos = db.execute_query("SELECT id, nome FROM cliente_grupos ORDER BY nome", fetch='all') or []
+
+    # Se já tiver um grupo selecionado (após filtrar), carregamos os tipos dele para o dropdown não vir vazio
+    lista_tipos_preenchidos = []
+    if filtro_grupo:
+        lista_tipos_preenchidos = db.execute_query(
+            "SELECT id, nome FROM cliente_tipos WHERE grupo_id = %s ORDER BY nome", (filtro_grupo,), fetch='all') or []
+
+    # 3. Montagem da Query de Clientes
+    # Precisamos do JOIN com cliente_tipos para filtrar pelo Grupo
+    base_query = """
+        FROM clientes c
+        LEFT JOIN cliente_tipos ct ON c.tipo_id = ct.id
+        LEFT JOIN cliente_grupos cg ON ct.grupo_id = cg.id
+    """
+
+    condicoes = []
+    params = []
+
+    # Filtro de Texto (Busca)
+    if busca:
+        condicoes.append("(c.nome LIKE %s OR c.identificador_principal LIKE %s OR c.email LIKE %s)")
+        termo = f"%{busca}%"
+        params.extend([termo, termo, termo])
+
+    # Filtro de Grupo (Indireto via JOIN)
+    if filtro_grupo:
+        condicoes.append("ct.grupo_id = %s")
+        params.append(filtro_grupo)
+
+    # Filtro de Tipo (Direto na tabela clientes ou tipos)
+    if filtro_tipo:
+        condicoes.append("c.tipo_id = %s")
+        params.append(filtro_tipo)
+
+    # Monta o WHERE se houver condições
+    clausula_where = ""
+    if condicoes:
+        clausula_where = "WHERE " + " AND ".join(condicoes)
+
+    # Query 1: Contagem Total (para paginação)
+    query_count = f"SELECT COUNT(c.id) as total {base_query} {clausula_where}"
+    total_registros = db.execute_query(query_count, tuple(params), fetch='one')['total']
+    total_paginas = math.ceil(total_registros / itens_por_pagina)
+
+    # Query 2: Buscar Dados (Incluindo nomes do tipo e grupo para exibir na tabela se quiser)
+    query_dados = f"""
+        SELECT 
+            c.id, c.nome, c.identificador_principal, c.email, c.telefone,
+            ct.nome as nome_tipo, cg.nome as nome_grupo
+        {base_query}
+        {clausula_where}
+        ORDER BY c.nome ASC
+        LIMIT %s OFFSET %s
+    """
+    params.append(itens_por_pagina)
+    params.append(offset)
+
+    clientes = db.execute_query(query_dados, tuple(params), fetch='all') or []
+
+    return render_template('crm_lista_clientes.html',
+                           clientes=clientes,
+                           busca=busca,
+                           filtro_grupo=filtro_grupo,
+                           filtro_tipo=filtro_tipo,
+                           lista_grupos=lista_grupos,
+                           lista_tipos_preenchidos=lista_tipos_preenchidos,
+                           pagina_atual=pagina,
+                           total_paginas=total_paginas,
+                           total_registros=total_registros)
+
+@app.route('/api/tipos_por_grupo/<int:grupo_id>')
+@login_required
+def api_tipos_por_grupo(grupo_id):
+    """
+    Retorna JSON com os tipos de cliente pertencentes a um grupo.
+    Usado pelo Javascript do filtro em cascata.
+    """
+    query = "SELECT id, nome FROM cliente_tipos WHERE grupo_id = %s ORDER BY nome"
+    tipos = db.execute_query(query, (grupo_id,), fetch='all') or []
+    return jsonify(tipos)

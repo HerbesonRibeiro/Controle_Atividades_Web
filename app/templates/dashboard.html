@@ -7,6 +7,33 @@
 
     <h1 class="page-title"><i class="fas fa-chart-line"></i> Dashboard</h1>
 
+    <div class="info-card" style="margin-bottom: 20px; padding: 15px;">
+        <form method="GET" action="{{ url_for('dashboard') }}" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+
+            {% if request.args.get('view_as_user_id') %}
+                <input type="hidden" name="view_as_user_id" value="{{ request.args.get('view_as_user_id') }}">
+            {% endif %}
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="data_inicio" style="font-weight: 600; font-size: 0.9rem;">Data Início:</label>
+                <input type="date" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}" class="form-control" required>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="data_fim" style="font-weight: 600; font-size: 0.9rem;">Data Fim:</label>
+                <input type="date" id="data_fim" name="data_fim" value="{{ filtros.data_fim }}" class="form-control" required>
+            </div>
+
+            <button type="submit" style="padding: 8px 20px; background-color: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; height: 38px;">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+
+            <a href="{{ url_for('dashboard') }}" style="padding: 8px 15px; background-color: var(--secondary-color); color: white; text-decoration: none; border-radius: 5px; height: 38px; display: flex; align-items: center;">
+                Limpar
+            </a>
+        </form>
+    </div>
+
     {# --- INÍCIO DA LÓGICA DE EXIBIÇÃO POR PERFIL --- #}
 
  {# --- 1. VISÃO DO ADMINISTRADOR --- #}
@@ -233,7 +260,7 @@
     {# --- FIM DA LÓGICA DE EXIBIÇÃO POR PERFIL --- #}
 
     <div class="info-card" style="margin-top: 20px;">
-        <h2>Atividades nos Últimos 7 Dias</h2>
+        <h2>Atividades por Período</h2>
         <div class="chart-container">
             <canvas id="atividadesChart"></canvas>
         </div>

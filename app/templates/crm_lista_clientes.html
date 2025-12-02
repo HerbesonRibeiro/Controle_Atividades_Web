@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block title %}Carteira de Clientes{% endblock %}
+
+{% block content %}
+<div class="content-container">
+
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-address-book"></i> Carteira de Clientes
+        </h1>
+    </div>
+
+    <div class="info-card">
+        <form method="GET" action="{{ url_for('crm_lista_clientes') }}">
+
+            <div class="form-grid-3"> <div class="form-group">
+                    <label for="busca">Buscar (Nome, RA, Email)</label>
+                    <input type="text" id="busca" name="busca" value="{{ busca }}"
+                           class="form-control" placeholder="Digite para buscar...">
+                </div>
+
+                <div class="form-group">
+                    <label for="filtro_grupo">Grupo de Cliente</label>
+                    <select id="filtro_grupo" name="filtro_grupo" onchange="carregarTipos(this.value)">
+                        <option value="">Todos os Grupos</option>
+                        {% for g in lista_grupos %}
+                            <option value="{{ g.id }}" {% if filtro_grupo|string == g.id|string %}selected{% endif %}>
+                                {{ g.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="filtro_tipo">Tipo de Cliente</label>
+                    <select id="filtro_tipo" name="filtro_tipo" {% if not filtro_grupo %}disabled{% endif %}>
+                        <option value="">Todos os Tipos</option>
+                        {% for t in lista_tipos_preenchidos %}
+                            <option value="{{ t.id }}" {% if filtro_tipo|string == t.id|string %}selected{% endif %}>
+                                {{ t.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group" style="display: flex; gap: 10px; align-items: flex-end;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+
+                    {% if busca or filtro_grupo or filtro_tipo %}
+                    <a href="{{ url_for('crm_lista_clientes') }}" class="btn-limpar" style="flex: 1;">
+                        <i class="fas fa-times"></i> Limpar
+                    </a>
+                    {% endif %}
+                </div>
+
+            </div>
+        </form>
+    </div>
+
+    <div class="info-card" style="margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+            <h3>Listando {{ clientes|length }} de {{ total_registros }} clientes</h3>
+        </div>
+
+        <div class="table-container-simple">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Grupo / Tipo</th> <th>Documento</th>
+                        <th>Contato</th>
+                        <th style="text-align: center;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in clientes %}
+                    <tr>
+                        <td>#{{ c.id }}</td>
+                        <td><strong>{{ c.nome }}</strong></td>
+                        <td>
+                            <span style="font-size: 0.85rem; color: #666;">{{ c.nome_grupo or '-' }}</span><br>
+                            <span style="font-weight: 600; color: var(--primary-color);">{{ c.nome_tipo or '-' }}</span>
+                        </td>
+                        <td>{{ c.identificador_principal or '-' }}</td>
+                        <td>
+                            <div style="font-size: 0.85rem;">
+                                {% if c.email %}<div><i class="fas fa-envelope"></i> {{ c.email }}</div>{% endif %}
+                                {% if c.telefone %}<div><i class="fas fa-phone"></i> {{ c.telefone }}</div>{% endif %}
+                            </div>
+                        </td>
+                        <td style="text-align: center;">
+                            <a href="{{ url_for('crm_historico_cliente', termo_busca=c.id) }}"
+                               class="btn btn-secondary"
+                               title="Ver Histórico Completo"
+                               style="padding: 5px 10px;">
+                                <i class="fas fa-clock"></i> Histórico
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 20px; color: #777;">
+                            Nenhum cliente encontrado com os filtros atuais.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if total_paginas > 1 %}
+        <div class="pagination" style="margin-top: 20px; display: flex; justify-content: center; gap: 5px;">
+            {% if pagina_atual > 1 %}
+                <a href="{{ url_for('crm_lista_clientes', page=pagina_atual-1, busca=busca, filtro_grupo=filtro_grupo, filtro_tipo=filtro_tipo) }}" class="btn btn-secondary">Anterior</a>
+            {% endif %}
+            <span style="display: flex; align-items: center; padding: 0 10px; font-weight: bold;">
+                Página {{ pagina_atual }} de {{ total_paginas }}
+            </span>
+            {% if pagina_atual < total_paginas %}
+                <a href="{{ url_for('crm_lista_clientes', page=pagina_atual+1, busca=busca, filtro_grupo=filtro_grupo, filtro_tipo=filtro_tipo) }}" class="btn btn-secondary">Próxima</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<script>
+    function carregarTipos(grupoId) {
+        const selectTipo = document.getElementById('filtro_tipo');
+
+        // 1. Limpa o select de Tipos
+        selectTipo.innerHTML = '<option value="">Todos os Tipos</option>';
+
+        // Se o usuário escolheu "Todos os Grupos" (vazio), bloqueia o Tipo e para.
+        if (!grupoId) {
+            selectTipo.disabled = true;
+            return;
+        }
+
+        // 2. Busca os dados na API Python
+        selectTipo.disabled = true; // Bloqueia enquanto carrega
+
+        fetch(`/api/tipos_por_grupo/${grupoId}`)
+            .then(response => response.json())
+            .then(data => {
+                // 3. Preenche o select com os dados recebidos
+                data.forEach(tipo => {
+                    const option = document.createElement('option');
+                    option.value = tipo.id;
+                    option.textContent = tipo.nome;
+                    selectTipo.appendChild(option);
+                });
+                // 4. Libera o select
+                selectTipo.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erro ao carregar tipos:', error);
+                selectTipo.disabled = false;
+            });
+    }
+</script>
+{% endblock %}

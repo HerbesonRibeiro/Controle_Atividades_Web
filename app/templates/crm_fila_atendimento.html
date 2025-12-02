@@ -19,7 +19,6 @@
     <form class="filter-bar" method="GET" action="{{ url_for('crm_fila_atendimento') }}">
 
         <div class="form-row">
-
             <div class="form-group" style="flex: 1;">
                 <label for="filtro_status">Ver Fila</label>
                 <select id="filtro_status" name="filtro_status">
@@ -52,11 +51,9 @@
                     {% endfor %}
                 </select>
             </div>
-
         </div>
 
         <div class="form-row">
-
             <div class="form-group" style="flex: 1;">
                 <label for="colaborador_filtro">Responsável</label>
                 <select id="colaborador_filtro" name="colaborador_filtro">
@@ -90,56 +87,70 @@
                 <label for="data_fim">Até:</label>
                 <input type="date" id="data_fim" name="data_fim" value="{{ filtros_aplicados.get('data_fim', '') }}">
             </div>
-
         </div>
 
-        <div class="form-row" style="justify-content: flex-end;">
-            <a href="{{ url_for('crm_fila_atendimento') }}" class="btn btn-secondary">Limpar Filtros</a>
-            <button type="submit" class="btn btn-primary" style="margin-left: 10px;">
+        <div class="form-row" style="justify-content: flex-end; align-items: flex-end; gap: 10px;">
+            <a href="{{ url_for('crm_fila_atendimento') }}" class="btn-limpar">
+                <i class="fas fa-undo"></i> Limpar Filtros
+            </a>
+
+            <button type="submit" class="btn btn-primary">
                 <i class="fas fa-filter"></i> Filtrar
             </button>
         </div>
     </form>
 </div>
 
-<div class="info-card table-container">
-    <table class="table-uppercase">
-        <thead>
+<div class="info-card table-responsive"> <table class="styled-table tabela-fila"> <thead>
             <tr>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Título / Assunto</th>
-                <th>Cliente</th>
-                <th>Responsável</th>
-                <th>Setor</th>
-                <th>Iniciado Em</th> <th>Última Atualização</th>
-                <th>Ações</th>
-            </tr>
+                <th style="width: 60px; text-align: center;">ID</th>
+                <th>Atendimento (Assunto)</th>
+                <th>Cliente / Setor</th>
+                <th style="width: 130px; text-align: center;">Status</th>
+                <th style="width: 60px; text-align: center;">Ações</th> </tr>
         </thead>
         <tbody>
             {% if lista_atendimentos %}
                 {% for atendimento in lista_atendimentos %}
                     <tr>
-                        <td>#{{ atendimento.id }}</td>
+                        <td style="text-align: center; font-weight: bold; color: #555;">
+                            #{{ atendimento.id }}
+                        </td>
+
                         <td>
+                            <div class="texto-limitado" title="{{ atendimento.titulo }}" style="font-weight: 600; font-size: 0.95rem; margin-bottom: 3px;">
+                                {{ atendimento.titulo }}
+                            </div>
+
+                            <div style="font-size: 0.8rem; color: #888;">
+                                <i class="far fa-calendar-alt"></i> Criado: {{ atendimento.criado_em.strftime('%d/%m %H:%M') }}
+                                <br>
+                                <i class="fas fa-history"></i> Atualizado: {{ atendimento.ultima_atualizacao.strftime('%d/%m %H:%M') }}
+                            </div>
+                        </td>
+
+                        <td>
+                            <div style="font-weight: 600; color: var(--primary-color);">
+                                <i class="fas fa-user"></i> {{ atendimento.cliente_nome }}
+                            </div>
+
+                            <div style="font-size: 0.85rem; color: #666; margin-top: 3px;">
+                                <strong>Setor:</strong> {{ atendimento.nome_setor }}
+                                <br>
+                                <strong>Resp:</strong> {{ atendimento.responsavel_nome }}
+                            </div>
+                        </td>
+
+                        <td style="text-align: center;">
                             <span class="status-badge status-{{ atendimento.status_fila | lower | replace(' ', '-') }}">
                                 {{ atendimento.status_fila }}
                             </span>
                         </td>
-                        <td data-label="Título">{{ atendimento.titulo }}</td>
-                        <td data-label="Cliente">{{ atendimento.cliente_nome }}</td>
-                        <td data-label="Responsável">{{ atendimento.responsavel_nome }}</td>
-                        <td data-label="Setor">{{ atendimento.nome_setor }}</td>
 
-                        <td data-label="Iniciado em">
-                            {{ atendimento.criado_em.strftime('%d/%m/%Y %H:%M') }}
-                        </td>
-
-                        <td data-label="Atualizado em">
-                            {{ atendimento.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') }}
-                        </td>
-                        <td data-label="Ações">
-                            <a href="{{ url_for('crm_detalhe_atendimento', atendimento_id=atendimento.id) }}" class="btn btn-action btn-primary" title="Ver / Atender">
+                        <td style="text-align: center;">
+                            <a href="{{ url_for('crm_detalhe_atendimento', atendimento_id=atendimento.id) }}"
+                               class="btn btn-action btn-primary"
+                               title="Ver Detalhes e Atender">
                                 <i class="fas fa-eye"></i>
                             </a>
                         </td>
@@ -147,7 +158,8 @@
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 30px;">
+                    <td colspan="5" style="text-align: center; padding: 40px; color: #777;">
+                        <i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 15px; display: block; opacity: 0.3;"></i>
                         Nenhum atendimento encontrado para os filtros aplicados.
                     </td>
                 </tr>
@@ -157,7 +169,7 @@
 </div>
 
 {% if total_pages > 1 %}
-    <div class="pagination">
+    <div class="pagination" style="display: flex; justify-content: center; margin-top: 20px;">
         <a href="{{ url_for('crm_fila_atendimento', page=1, **filtros_aplicados) }}"
            class="page-link {{ 'disabled' if current_page == 1 else '' }}"
            title="Primeira Página">&laquo;</a>
@@ -193,4 +205,5 @@
            title="Última Página">&raquo;</a>
     </div>
 {% endif %}
+
 {% endblock %}
