@@ -67,12 +67,14 @@
 
     {% if lista_clientes_ambiguos %}
         <div class="info-card" style="margin-top: 20px; background-color: #fff3cd; border-left: 5px solid #ffc107;">
+
             <h3 style="color: #856404; margin-top: 0;">
                 <i class="fas fa-exclamation-triangle"></i>
-                Encontramos {{ lista_clientes_ambiguos | length }} clientes com esse nome
+                {{ msg_alerta_titulo }}
             </h3>
+
             <p style="color: #856404;">
-                Para evitar erros, por favor <strong>selecione o cliente correto</strong> na lista abaixo:
+                {{ msg_alerta_desc }}
             </p>
 
             <div class="table-container-simple" style="background: #fff; border-radius: 8px; padding: 10px;">
@@ -94,7 +96,11 @@
                             <td>{{ c.identificador_principal }}</td>
                             <td>{{ c.email }}</td>
                             <td style="text-align: center;">
-                                <a href="{{ url_for('crm_historico_cliente', termo_busca=c.id) }}"
+                                <a href="{{ url_for('crm_historico_cliente',
+                                                    termo_busca=c.id,
+                                                    filtro_setor_id=filtro_setor_id,
+                                                    data_inicio=data_inicio,
+                                                    data_fim=data_fim) }}"
                                    class="btn btn-primary" style="padding: 5px 15px; font-size: 0.85rem;">
                                     <i class="fas fa-check"></i> Selecionar
                                 </a>
@@ -206,7 +212,7 @@
             <i class="fas fa-search" style="font-size: 3rem; color: #ddd; margin-bottom: 15px;"></i>
             <h3 style="color: var(--secondary-color);">Cliente não encontrado</h3>
             <p style="color: var(--dark-gray);">
-                Não encontramos nenhum registro para "<strong>{{ termo_busca }}</strong>".
+                Não encontramos nenhum registro para "<strong>{{ termo_busca }}</strong>" com os filtros aplicados.
             </p>
         </div>
     {% endif %}

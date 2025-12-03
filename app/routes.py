@@ -2160,15 +2160,7 @@ def admin_gestao_origens():
 @app.route('/crm/historico_cliente', methods=['GET'])
 @login_required
 def crm_historico_cliente():
-    """
-    Exibe a página de "Histórico do Cliente".
-    Implementa lógica profissional de desambiguação:
-    1. Se achar 1 cliente -> Abre direto.
-    2. Se achar vários -> Mostra lista para escolha.
-    3. Se busca for ID exato -> Abre direto.
-    """
-
-    # --- 1. Captura Parâmetros ---
+    # 1. Captura Parâmetros
     termo_busca = request.args.get('termo_busca', '').strip()
     filtro_setor_id = request.args.get('filtro_setor_id', '')
     data_inicio = request.args.get('data_inicio', '')
@@ -2179,24 +2171,29 @@ def crm_historico_cliente():
     lista_clientes_ambiguos = []
     atendimentos_do_cliente = []
 
-    # Lista de setores para o dropdown do filtro
+    # Textos de alerta
+    msg_alerta_titulo = ""
+    msg_alerta_desc = ""
+
     lista_setores_todos = db.execute_query("SELECT id, nome_setor FROM setores ORDER BY nome_setor", fetch='all') or []
 
-    if termo_busca:
-        try:
-            # --- 2. Estratégia de Busca Inteligente ---
+    try:
+        # =====================================================================
+        # CENÁRIO A: Busca por Nome/ID (Quando você clica em Selecionar ou digita)
+        # =====================================================================
+        if termo_busca:
+            candidatos = []  # Variável unificada em Português
 
-            candidatos = []
-
-            # A) Se o termo for numérico, tenta achar pelo ID exato primeiro (prioridade máxima)
-            # Isso serve para quando o usuário clica em "Selecionar" na lista de homônimos
+            # 1. Tenta achar pelo ID exato (Prioridade)
             if termo_busca.isdigit():
                 query_id = "SELECT id, nome, identificador_principal, email, telefone FROM clientes WHERE id = %s"
                 candidato_id = db.execute_query(query_id, (termo_busca,), fetch='one')
-                if candidato_id:
-                    candidatos = [candidato_id]  # Transforma em lista para usar a logica abaixo
 
-            # B) Se não achou por ID (ou não é número), busca por Nome ou Documento (Busca Ampla)
+                # [CORREÇÃO AQUI]: Usando o nome correto da variável 'candidatos'
+                if candidato_id:
+                    candidatos = [candidato_id]
+
+            # 2. Se não achou por ID, busca por Nome ou Documento
             if not candidatos:
                 query_busca = """
                     SELECT id, nome, identificador_principal, email, telefone 
@@ -2204,76 +2201,109 @@ def crm_historico_cliente():
                     WHERE identificador_principal = %s OR nome LIKE %s
                     LIMIT 20 
                 """
-                # LIMIT 20 previne travar o banco se alguém buscar "a"
                 termo_like = f"%{termo_busca}%"
                 candidatos = db.execute_query(query_busca, (termo_busca, termo_like), fetch='all') or []
 
-            # --- 3. Tomada de Decisão (O "Cérebro" da Rota) ---
-
+            # 3. Decisão
             if len(candidatos) == 1:
-                # CENÁRIO PERFEITO: Só existe um cliente com esse dado.
                 cliente_encontrado = candidatos[0]
 
             elif len(candidatos) > 1:
-                # CENÁRIO DE AMBIGUIDADE: Existem homônimos.
-                # Não carregamos histórico ainda. Enviamos a lista para o HTML.
                 lista_clientes_ambiguos = candidatos
-                flash(
-                    f'Encontramos {len(candidatos)} clientes com termos parecidos. Por favor, selecione o correto abaixo.',
-                    'warning')
+                msg_alerta_titulo = f"Encontramos {len(candidatos)} clientes com nomes parecidos"
+                msg_alerta_desc = "Por favor, verifique o RA/Documento e selecione o cliente correto:"
 
             else:
-                # CENÁRIO VAZIO
-                flash(f'Nenhum cliente encontrado para "{termo_busca}".', 'info')
+                flash(f'Nenhum cliente encontrado para o termo "{termo_busca}".', 'info')
 
-            # --- 4. Se temos UM cliente definido, carregamos o histórico ---
-            if cliente_encontrado:
-                query_atendimentos = """
-                    SELECT 
-                        id, titulo, status_fila, status_interno, criado_em, ultima_atualizacao,
-                        pds_gerar, pds_status,
-                        ROUND(TIME_TO_SEC(TIMEDIFF(ultima_atualizacao, criado_em)) / 3600, 1) AS duracao_horas
-                    FROM atendimentos
-                    WHERE cliente_id = %s
-                """
-                params = [cliente_encontrado['id']]
+        # =====================================================================
+        # CENÁRIO B: Busca APENAS por Filtros (Data/Setor)
+        # =====================================================================
+        elif filtro_setor_id or data_inicio or data_fim:
 
-                # Filtros Opcionais
-                if filtro_setor_id:
-                    query_atendimentos += " AND setor_responsavel_id = %s"
-                    params.append(filtro_setor_id)
+            query_busca_por_filtro = """
+                SELECT DISTINCT c.id, c.nome, c.identificador_principal, c.email, c.telefone
+                FROM clientes c
+                JOIN atendimentos a ON a.cliente_id = c.id
+                WHERE 1=1
+            """
+            params_filtro = []
 
-                if data_inicio:
-                    query_atendimentos += " AND criado_em >= %s"
-                    params.append(data_inicio)
+            if filtro_setor_id:
+                query_busca_por_filtro += " AND a.setor_responsavel_id = %s"
+                params_filtro.append(filtro_setor_id)
 
-                if data_fim:
-                    query_atendimentos += " AND criado_em <= %s"
-                    params.append(f"{data_fim} 23:59:59")
+            if data_inicio:
+                query_busca_por_filtro += " AND a.criado_em >= %s"
+                params_filtro.append(data_inicio)
 
-                query_atendimentos += " ORDER BY criado_em DESC"
+            if data_fim:
+                query_busca_por_filtro += " AND a.criado_em <= %s"
+                params_filtro.append(f"{data_fim} 23:59:59")
 
-                atendimentos_do_cliente = db.execute_query(query_atendimentos, tuple(params), fetch='all') or []
+            query_busca_por_filtro += " LIMIT 50"
 
-                if not atendimentos_do_cliente:
-                    flash('Cliente localizado, mas não há histórico de atendimentos com os filtros atuais.', 'info')
+            resultados = db.execute_query(query_busca_por_filtro, tuple(params_filtro), fetch='all') or []
 
-        except Exception as e:
-            print(f"Erro no CRM: {e}")  # Log no terminal para você ver
-            flash(f'Erro ao processar busca: {str(e)}', 'danger')
+            if len(resultados) == 1:
+                cliente_encontrado = resultados[0]
+            elif len(resultados) > 1:
+                lista_clientes_ambiguos = resultados
+                msg_alerta_titulo = f"Encontramos {len(resultados)} clientes neste período/setor"
+                msg_alerta_desc = "Estes clientes tiveram atendimentos dentro dos filtros selecionados. Qual deles você deseja visualizar?"
+            else:
+                flash('Nenhum atendimento encontrado para estes filtros.', 'warning')
 
-    # --- 5. Renderização ---
+        # =====================================================================
+        # CARREGAR HISTÓRICO (Se já tivermos o cliente definido)
+        # =====================================================================
+        if cliente_encontrado:
+            query_atendimentos = """
+                SELECT 
+                    id, titulo, status_fila, status_interno, criado_em, ultima_atualizacao,
+                    pds_gerar, pds_status,
+                    ROUND(TIME_TO_SEC(TIMEDIFF(ultima_atualizacao, criado_em)) / 3600, 1) AS duracao_horas
+                FROM atendimentos
+                WHERE cliente_id = %s
+            """
+            params = [cliente_encontrado['id']]
+
+            # Aplica filtros extras SE eles existirem na URL
+            if filtro_setor_id:
+                query_atendimentos += " AND setor_responsavel_id = %s"
+                params.append(filtro_setor_id)
+
+            if data_inicio:
+                query_atendimentos += " AND criado_em >= %s"
+                params.append(data_inicio)
+
+            if data_fim:
+                query_atendimentos += " AND criado_em <= %s"
+                params.append(f"{data_fim} 23:59:59")
+
+            query_atendimentos += " ORDER BY criado_em DESC"
+
+            atendimentos_do_cliente = db.execute_query(query_atendimentos, tuple(params), fetch='all') or []
+
+            if not atendimentos_do_cliente:
+                # Mensagem específica para quando acha o cliente, mas o filtro de data esconde os tickets
+                flash('Cliente localizado, mas ele não tem atendimentos nestes filtros específicos.', 'info')
+
+    except Exception as e:
+        print(f"Erro no CRM: {e}")
+        flash(f'Erro ao processar busca: {str(e)}', 'danger')
+
     return render_template('crm_historico_cliente.html',
                            termo_busca=termo_busca,
                            filtro_setor_id=filtro_setor_id,
                            data_inicio=data_inicio,
                            data_fim=data_fim,
                            lista_setores_todos=lista_setores_todos,
-                           # Passamos as variáveis cruciais:
                            cliente=cliente_encontrado,
                            atendimentos=atendimentos_do_cliente,
-                           lista_clientes_ambiguos=lista_clientes_ambiguos)
-
+                           lista_clientes_ambiguos=lista_clientes_ambiguos,
+                           msg_alerta_titulo=msg_alerta_titulo,
+                           msg_alerta_desc=msg_alerta_desc)
 
 # =============================================================================
 # [PASSO 3] Rota da Pesquisa de Satisfação (PDS)
