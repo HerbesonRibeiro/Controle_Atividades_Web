@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Tarefas - Seleção de Setor{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='kanban.css') }}">
+
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 kb-wrapper">
+
+    <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-2 px-3 rounded shadow-sm border-start border-primary border-4">
+        <div class="d-flex align-items-center gap-3">
+            <div>
+                <h5 class="m-0 fw-bold text-primary" style="font-size: 1.1rem;">
+                    <i class="fas fa-tasks me-2"></i>Gestão de Tarefas
+                </h5>
+                <small class="text-muted" id="kb-breadcrumbs">Selecione um Setor</small>
+            </div>
+            <button id="btn-master" class="btn btn-primary btn-sm rounded-pill px-3" onclick="carregarVisaoMaster()">
+                <i class="fas fa-globe-americas me-1"></i> Visão Geral
+            </button>
+        </div>
+        <button id="btn-voltar" class="btn btn-outline-secondary btn-sm" style="display: none;" onclick="voltar()">
+            <i class="fas fa-arrow-left me-1"></i> Voltar
+        </button>
+    </div>
+
+    <div id="view-setores" class="view-section active">
+        <div id="grid-setores" class="row g-3"></div>
+    </div>
+
+    <div id="view-colaboradores" class="view-section" style="display: none;">
+        <h6 class="text-muted mb-3" id="titulo-setor-selecionado">Colaboradores</h6>
+        <div id="grid-colaboradores" class="row g-3"></div>
+    </div>
+
+    <div id="view-kanban" class="view-section" style="display: none;">
+        <div class="d-flex justify-content-between mb-3">
+            <h5 id="titulo-kanban-colaborador" class="fw-bold text-dark"></h5>
+            <button class="btn btn-primary" onclick="abrirModalNovaTarefa()">
+                <i class="fas fa-plus me-2"></i>Nova Tarefa
+            </button>
+        </div>
+        <div class="row h-100 g-4">
+            <div class="col-md-4 h-100">
+                <div class="kb-column h-100 d-flex flex-column">
+                    <div class="kb-column-header header-todo"><i class="fas fa-clipboard-list me-2"></i> A Fazer</div>
+                    <div id="col-fazer" class="kb-task-list flex-grow-1 custom-scrollbar" ondrop="drop(event)" ondragover="allowDrop(event)" data-status="a_fazer"></div>
+                </div>
+            </div>
+            <div class="col-md-4 h-100">
+                <div class="kb-column h-100 d-flex flex-column">
+                    <div class="kb-column-header header-doing"><i class="fas fa-spinner me-2 fa-spin-hover"></i> Em Andamento</div>
+                    <div id="col-andamento" class="kb-task-list flex-grow-1 custom-scrollbar" ondrop="drop(event)" ondragover="allowDrop(event)" data-status="em_andamento"></div>
+                </div>
+            </div>
+            <div class="col-md-4 h-100">
+                <div class="kb-column h-100 d-flex flex-column">
+                    <div class="kb-column-header header-done d-flex justify-content-between align-items-center">
+                        <div><i class="fas fa-check-circle me-2"></i> Concluído</div>
+                        <button class="btn btn-sm btn-outline-success bg-white py-0 px-2" style="font-size: 0.7rem; border-radius: 20px;" onclick="abrirModalHistorico()" title="Ver histórico completo">
+                            <i class="fas fa-history me-1"></i> Histórico
+                        </button>
+                    </div>
+
+                    <div id="col-concluido" class="kb-task-list flex-grow-1 custom-scrollbar" ondrop="drop(event)" ondragover="allowDrop(event)" data-status="concluido"></div>
+
+                    <div class="text-center py-2 text-muted small fst-italic border-top">
+                        Exibindo as últimas 5
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalNovaTarefa" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered"> <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-primary">Nova Tarefa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formNovaTarefa">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold text-muted text-uppercase">Título</label>
+                                <input type="text" class="form-control form-control-lg" id="inputTitulo" placeholder="Ex: Relatório mensal..." required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted text-uppercase">Prioridade</label>
+                                <select class="form-select" id="inputPrioridade">
+                                    <option value="baixa">Baixa</option>
+                                    <option value="media">Média</option>
+                                    <option value="alta">Alta</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted text-uppercase">Descrição</label>
+                            <div id="editor-container" style="height: 150px; background: white;"></div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted text-uppercase">Prazo</label>
+                                <input type="date" class="form-control" id="inputPrazo" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted text-uppercase">Tipo</label>
+                                <select class="form-select" id="inputTipoAtendimento">
+                                    <option value="">Carregando...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted text-uppercase">Anexo</label>
+                                <input type="file" class="form-control form-control-sm" id="inputAnexo">
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold text-muted text-uppercase">Responsáveis</label>
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="buscaColaborador" placeholder="Buscar colaborador..." autocomplete="off">
+                                <div id="listaResultados" class="list-group position-absolute w-100 shadow" style="z-index: 1000; display:none; max-height: 200px; overflow-y: auto;"></div>
+                            </div>
+                            <div id="areaTags" class="d-flex flex-wrap gap-2 mt-2"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary px-4" onclick="salvarNovaTarefa()">Criar Tarefa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditarTarefa" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header px-4">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="fas fa-edit me-2 text-primary"></i>Detalhes da Tarefa
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body px-4 py-3">
+                    <form id="formEditarTarefa">
+                        <input type="hidden" id="editIdTarefa">
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted text-uppercase mb-1">Título da Tarefa</label>
+                            <input type="text" class="form-control form-control-lg fw-bold" id="editTitulo" required>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-5">
+                                <label class="small fw-bold text-muted text-uppercase mb-1">Tipo de Atividade</label>
+                                <select class="form-select bg-light" id="editTipoAtendimento">
+                                    </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="small fw-bold text-muted text-uppercase mb-1">Prioridade</label>
+                                <select class="form-select" id="editPrioridade">
+                                    <option value="baixa">Baixa</option>
+                                    <option value="media">Média</option>
+                                    <option value="alta">Alta</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="small fw-bold text-muted text-uppercase mb-1">Data de Entrega</label>
+                                <input type="date" class="form-control" id="editPrazo">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted text-uppercase mb-1">Descrição</label>
+                            <div id="editor-container-edit" style="height: 150px; background: white;"></div>
+                        </div>
+
+                        <div id="areaAnexoExistente" class="mb-4" style="display: none !important;">
+                            <label class="small fw-bold text-muted text-uppercase mb-2"><i class="fas fa-paperclip me-1"></i> Anexos</label>
+                            <div class="d-flex align-items-center">
+                                <div class="attachment-card w-100">
+                                    <i class="fas fa-file-alt text-primary fs-4"></i>
+                                    <div class="ms-3 flex-grow-1 overflow-hidden">
+                                        <span id="nomeAnexoAtual" class="fw-bold text-dark d-block text-truncate"></span>
+                                        <small class="text-muted">Clique para baixar</small>
+                                    </div>
+                                    <a id="linkAnexoAtual" href="#" target="_blank" download class="btn btn-sm btn-outline-primary ms-2">
+                                        <i class="fas fa-download"></i> Baixar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-activity mt-4">
+                            <div class="row">
+                                <div class="col-md-3 border-end">
+                                    <h6 class="fw-bold small text-muted text-uppercase mb-3"><i class="fas fa-users me-2"></i>Equipe</h6>
+
+                                    <div id="areaVinculos" style="display: none;">
+                                        <ul class="list-unstyled mb-0" id="listaVinculos"></ul>
+                                    </div>
+                                    <div id="semVinculos" class="text-muted small fst-italic">Apenas você.</div>
+                                </div>
+
+                                <div class="col-md-9 ps-md-4">
+                                    <h6 class="fw-bold small text-muted text-uppercase mb-3"><i class="fas fa-comments me-2"></i>Comentários</h6>
+
+                                    <div id="listaComentarios" class="mb-3 custom-scrollbar"
+                                         style="max-height: 150px; overflow-y: auto;">
+                                    </div>
+
+                                    <div class="input-group">
+                                        <input type="text" id="inputNovoComentario" class="form-control bg-white" placeholder="Escreva um comentário...">
+                                        <button type="button" class="btn btn-primary" onclick="enviarComentario()">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+
+                <div class="modal-footer px-4 py-2 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-danger" onclick="confirmarExclusao()">
+                        <i class="fas fa-trash-alt me-2"></i>Excluir
+                    </button>
+
+                    <div>
+                        <button type="button" class="btn btn-light me-2" data-bs-dismiss="modal">Fechar</button>
+                        <button type="button" class="btn btn-success px-4" onclick="salvarEdicaoTarefa()">
+                            <i class="fas fa-check me-2"></i>Salvar Alterações
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <div class="modal fade" id="modalHistoricoTarefas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fs-6"><i class="fas fa-history me-2"></i>Histórico de Conclusão</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="listaHistorico" class="list-group list-group-flush">
+                    </div>
+            </div>
+            <div class="modal-footer py-1">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='kanban.js') }}"></script>
+
+{% endblock %}

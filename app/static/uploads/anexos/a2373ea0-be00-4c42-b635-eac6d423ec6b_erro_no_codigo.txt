@@ -1,0 +1,1070 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Tarefas{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='kanban.css') }}?v=8">
+{% endblock %}
+
+{% block content %}
+
+<div class="kb-wrapper">
+
+    <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded shadow-sm border">
+        <h4 class="m-0 fw-bold" style="color: #0d6efd;">
+            <i class="fas fa-tasks me-2"></i>Gestão de Tarefas
+        </h4>
+        <button id="btn-voltar" class="btn btn-outline-secondary btn-sm" onclick="voltar()" style="display: none;">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </button>
+    </div>
+
+    <div id="view-setores" class="view-section active">
+        <h5 class="mb-3 text-secondary">Selecione o Setor</h5>
+        <div class="kb-grid">
+            <p class="text-muted">Carregando setores...</p>
+        </div>
+    </div>
+
+    <div id="view-colaboradores" class="view-section">
+        <h5 class="mb-3 text-secondary">Setor: <span id="lbl-setor" class="fw-bold text-primary"></span></h5>
+        <div id="lista-colaboradores" class="kb-grid">
+        </div>
+    </div>
+
+    <div id="view-kanban" class="view-section">
+        <div class="d-flex justify-content-between mb-3">
+            <h5 class="fw-bold text-dark m-0 pt-1">Quadro de: <span id="lbl-colaborador"></span></h5>
+            <div class="d-flex gap-2">
+                <input type="text" id="filtroBusca" class="form-control form-control-sm" placeholder="🔍 Filtrar..." onkeyup="filtrarTarefas()" style="width: 150px;">
+                <button class="btn btn-primary btn-sm" onclick="abrirModalTarefa()">
+                    <i class="fas fa-plus"></i> Nova Tarefa
+                </button>
+            </div>
+        </div>
+
+        <div class="kb-board">
+            <div class="kb-column">
+                <div class="kb-column-header"><span>A Fazer</span></div>
+                <div id="col-fazer" class="kb-task-list"></div>
+            </div>
+
+            <div class="kb-column">
+                <div class="kb-column-header"><span>Em Andamento</span></div>
+                <div id="col-andamento" class="kb-task-list"></div>
+            </div>
+
+            <div class="kb-column">
+                <div class="kb-column-header"><span>Concluído (Recentes)</span></div>
+                <div id="col-concluido" class="kb-task-list"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<datalist id="listaTagsSugestao"></datalist>
+
+<div class="modal fade" id="modalNovaTarefa" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Nova Tarefa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-nova-tarefa">
+
+            <div class="mb-3">
+                <label for="input-titulo" class="form-label fw-bold small">Título da Tarefa</label>
+                <input type="text" class="form-control form-control-sm" id="input-titulo" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="input-responsavel" class="form-label fw-bold small">Responsável</label>
+                <select class="form-select form-select-sm" id="input-responsavel" multiple required>
+                    </select>
+                <div class="form-text small">Segure Ctrl para selecionar vários.</div>
+            </div>
+
+            <div class="mb-3">
+                <label for="input-tipo-atendimento" class="form-label fw-bold small">Tipo de Atendimento</label>
+                <select class="form-select form-select-sm" id="input-tipo-atendimento" required>
+                    <option value="" selected disabled>Carregando...</option>
+                </select>
+            </div>
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label for="input-prioridade" class="form-label fw-bold small">Prioridade</label>
+                    <select class="form-select form-select-sm" id="input-prioridade">
+                        <option value="baixa">Baixa</option>
+                        <option value="media" selected>Média</option>
+                        <option value="alta">Alta</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label for="input-prazo" class="form-label fw-bold small">Prazo (Opcional)</label>
+                    <input type="date" class="form-control form-control-sm" id="input-prazo">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="input-anexo" class="form-label fw-bold small">Anexar Arquivo (Opcional)</label>
+                <input class="form-control form-control-sm" type="file" id="input-anexo" name="arquivo_anexo">
+            </div>
+
+            <div class="mb-3">
+                <label for="input-descricao" class="form-label fw-bold small">Descrição</label>
+                <textarea class="form-control form-control-sm" id="input-descricao" rows="3"></textarea>
+            </div>
+        </form>
+    </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btnSalvarNova" class="btn btn-primary" onclick="salvarNovaTarefa()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalEditarTarefa" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title">Editar Tarefa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formEditarTarefa">
+            <input type="hidden" id="editId">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Título *</label>
+                <input type="text" class="form-control" id="editTitulo" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Etiqueta</label>
+                <input class="form-control" list="listaTagsSugestao" id="editEtiqueta" placeholder="Digite ou selecione...">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Tipo de Atendimento</label>
+                <select class="form-select" id="editTipoAtendimento"></select>
+            </div>
+
+            <div class="row">
+                <div class="col-6 mb-3">
+                    <label class="form-label">Prioridade</label>
+                    <select class="form-select" id="editPrioridade">
+                        <option value="baixa">Baixa</option>
+                        <option value="media">Média</option>
+                        <option value="alta">Alta</option>
+                    </select>
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label">Prazo</label>
+                    <input type="date" class="form-control" id="editPrazo">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Descrição</label>
+                <textarea class="form-control" id="editDescricao" rows="3"></textarea>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btnSalvarEdicao" class="btn btn-primary" onclick="salvarEdicaoTarefa()">Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalHistorico" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title"><i class="fas fa-history me-2"></i>Histórico Completo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th style="width: 50%;">Tarefa</th>
+                        <th style="width: 30%;">Concluído em</th>
+                        <th style="width: 20%;">Prioridade</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-historico"></tbody>
+            </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalDetalhes" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="detalheTitulo">Detalhes da Tarefa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <p class="text-muted mb-1">Descrição:</p>
+                <div id="detalheDescricao" class="p-3 bg-light rounded mb-3"></div>
+
+                <div id="areaEquipeVinculada" class="mb-3 p-2 border rounded d-none" style="background-color: #f8f9fa;">
+                    <h6 class="small fw-bold text-uppercase text-muted mb-2"><i class="fas fa-users me-1"></i> Equipe nesta Tarefa:</h6>
+                    <ul id="listaEquipe" class="list-unstyled small mb-0"></ul>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card p-3 border-0 bg-light">
+                    <small>Etiqueta:</small> <span id="detalheEtiqueta" class="fw-bold"></span>
+                    <small class="mt-2">Prazo:</small> <span id="detalhePrazo" class="fw-bold"></span>
+                    <small class="mt-2">Prioridade:</small> <span id="detalhePrioridade"></span>
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <h6><i class="fas fa-comments me-2"></i>Comentários / Histórico</h6>
+        <div id="listaComentarios" class="mb-3" style="max-height: 250px; overflow-y: auto;"></div>
+
+        <div class="d-flex gap-2">
+            <input type="text" id="inputNovoComentario" class="form-control" placeholder="Escreva um comentário...">
+            <button class="btn btn-primary" onclick="enviarComentario()">Enviar</button>
+        </div>
+        <input type="hidden" id="detalheTarefaId">
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalSelecaoEquipe" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Selecionar Equipe</h5>
+        <button type="button" class="btn-close" onclick="fecharModalSelecaoEquipe()"></button>
+      </div>
+      <div class="modal-body">
+
+        <input type="text" id="buscaColaboradorEquipe" class="form-control mb-3" placeholder="🔍 Buscar nome..." onkeyup="filtrarListaEquipe()">
+
+        <div id="listaTodosColaboradores" class="list-group list-group-flush">
+            </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary w-100" onclick="confirmarSelecaoEquipe()">Confirmar Seleção</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 2000;"></div>
+
+<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>-->
+<!--<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>-->
+
+<script>
+    // --- VARIÁVEIS GLOBAIS ---
+    let historico = ['view-setores'];
+    let colaboradorAtualId = null;
+    let listaTodosUsuariosCache = []; // Cache para a equipe
+
+    // --- INICIALIZAÇÃO ---
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarSetores();
+        carregarTagsSugestao();
+        carregarTiposAtendimento();
+
+        // Configura Drag and Drop
+        ['col-fazer', 'col-andamento', 'col-concluido'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el){
+                new Sortable(el, {
+                    group: 'kanban',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    onEnd: function (evt) {
+                        const cardId = evt.item.dataset.id;
+                        const novaColuna = evt.to.id;
+
+                        let novoStatus = '';
+                        if (novaColuna === 'col-fazer') novoStatus = 'a_fazer';
+                        if (novaColuna === 'col-andamento') novoStatus = 'em_andamento';
+                        if (novaColuna === 'col-concluido') novoStatus = 'concluido';
+
+                        if(novoStatus) {
+                            moverTarefa(cardId, novoStatus);
+                        }
+                    }
+                });
+            }
+        });
+    });
+    // --- FUNÇÃO DE NOTIFICAÇÃO (SUBSTITUI ALERT) ---
+    function mostrarNotificacao(mensagem, tipo = 'sucesso') {
+        const container = document.querySelector('.toast-container');
+
+        // Define cor: 'erro' fica vermelho, qualquer outro fica verde/azul
+        const classeCor = tipo === 'erro' ? 'text-bg-danger' : 'text-bg-success';
+        const icone = tipo === 'erro' ? 'fa-exclamation-circle' : 'fa-check-circle';
+
+        const toastHtml = `
+            <div class="toast align-items-center ${classeCor} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body d-flex align-items-center gap-2">
+                        <i class="fas ${icone}"></i>
+                        <span>${mensagem}</span>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        `;
+
+        // Transforma string em elemento DOM
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = toastHtml;
+        const toastEl = wrapper.firstElementChild;
+
+        container.appendChild(toastEl);
+
+        // Inicializa e mostra usando Bootstrap
+        const toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+        toast.show();
+
+        // Remove do HTML depois que sumir para não acumular lixo
+        toastEl.addEventListener('hidden.bs.toast', () => {
+            toastEl.remove();
+        });
+    }
+    // --- FUNÇÃO AUXILIAR DE LOADING ---
+    function alternarLoading(btnId, ativado) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+
+        if (ativado) {
+            // Guarda o texto original (ex: "Salvar") para não perder
+            btn.dataset.textoOriginal = btn.innerHTML;
+            // Desabilita e põe o spinner
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+        } else {
+            // Reabilita e devolve o texto original
+            btn.disabled = false;
+            btn.innerHTML = btn.dataset.textoOriginal || 'Salvar';
+        }
+    }
+
+    // --- 0. FUNÇÕES AUXILIARES (CORES) ---
+    function gerarCorPorTexto(texto) {
+        if(!texto || texto === 'Geral') return '#f0f0f0';
+        let hash = 0;
+        for (let i = 0; i < texto.length; i++) { hash = texto.charCodeAt(i) + ((hash << 5) - hash); }
+        let h = Math.abs(hash % 360);
+        return `hsl(${h}, 70%, 85%)`;
+    }
+
+    function gerarCorTexto(texto) {
+        if(!texto || texto === 'Geral') return '#333';
+        let hash = 0;
+        for (let i = 0; i < texto.length; i++) { hash = texto.charCodeAt(i) + ((hash << 5) - hash); }
+        let h = Math.abs(hash % 360);
+        return `hsl(${h}, 80%, 25%)`;
+    }
+
+    function carregarTagsSugestao() {
+        fetch('/api/kanban/etiquetas_existentes')
+            .then(res => res.json())
+            .then(lista => {
+                const dl = document.getElementById('listaTagsSugestao');
+                if(dl) {
+                    dl.innerHTML = '';
+                    lista.forEach(tag => { dl.innerHTML += `<option value="${tag}">`; });
+                }
+            })
+            .catch(() => {});
+    }
+
+    // --- 1. CARREGAR SETORES ---
+    function carregarSetores() {
+        fetch('/api/kanban/setores')
+            .then(res => res.json())
+            .then(data => {
+                const container = document.querySelector('#view-setores .kb-grid');
+                container.innerHTML = '';
+
+                if(!data || data.length === 0) {
+                    container.innerHTML = '<p class="text-muted">Nenhum setor encontrado.</p>';
+                    return;
+                }
+
+                data.forEach(setor => {
+                    let icone = 'fa-building';
+                    const nome = setor.nome.toLowerCase();
+                    if(nome.includes('adm') || nome.includes('dev')) icone = 'fa-laptop-code';
+                    else if(nome.includes('sec')) icone = 'fa-user-graduate';
+                    else if(nome.includes('finan') || nome.includes('tesou')) icone = 'fa-hand-holding-usd';
+                    else if(nome.includes('rh') || nome.includes('humanos')) icone = 'fa-users';
+                    else if(nome.includes('atend') || nome.includes('sac')) icone = 'fa-comments';
+
+                    container.innerHTML += `
+                    <div class="kb-nav-card" onclick="irParaColaboradores('${setor.nome}')">
+                        <div class="kb-icon-circle"><i class="fas ${icone}"></i></div>
+                        <h5>${setor.nome}</h5>
+                        <small>${setor.qtd_colaboradores} Colaboradores</small>
+                    </div>`;
+                });
+            })
+            .catch(err => console.error("Erro setores:", err));
+    }
+
+    // --- 2. CARREGAR COLABORADORES ---
+    function irParaColaboradores(setorNome) {
+        document.getElementById('lbl-setor').innerText = setorNome;
+        fetch(`/api/kanban/colaboradores/${encodeURIComponent(setorNome)}`)
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('lista-colaboradores');
+                container.innerHTML = '';
+
+                if(data.length === 0) {
+                    container.innerHTML = '<p class="text-muted">Nenhum colaborador ativo.</p>';
+                } else {
+                    data.forEach(colab => {
+                        let inicial = colab.nome ? colab.nome.charAt(0) : '?';
+                        container.innerHTML += `
+                        <div class="kb-nav-card" onclick="irParaKanban(${colab.id}, '${colab.nome}')">
+                            <div class="kb-icon-circle" style="background:#0d6efd; color:white; font-size:1.2rem;">
+                                ${inicial}
+                            </div>
+                            <h5 class="mt-3">${colab.nome}</h5>
+                            <small class="text-muted">Ver Tarefas</small>
+                        </div>`;
+                    });
+                }
+                navegar('view-colaboradores');
+            });
+    }
+
+    // --- 3. CARREGAR KANBAN ---
+    function irParaKanban(id, nome) {
+        colaboradorAtualId = id;
+        document.getElementById('lbl-colaborador').innerText = nome;
+
+        document.getElementById('col-fazer').innerHTML = '';
+        document.getElementById('col-andamento').innerHTML = '';
+        const colConcluido = document.getElementById('col-concluido');
+        colConcluido.innerHTML = '';
+
+        fetch(`/api/kanban/tarefas/${id}`)
+            .then(res => res.json())
+            .then(tarefas => {
+                tarefas.forEach(tarefa => criarCardHTML(tarefa));
+                colConcluido.innerHTML += `
+                    <div class="text-center mt-3 mb-2">
+                        <button class="btn btn-outline-secondary btn-sm w-100" onclick="abrirHistorico()">
+                            <i class="fas fa-list me-1"></i> Ver Histórico Completo
+                        </button>
+                    </div>
+                `;
+                navegar('view-kanban');
+            });
+    }
+
+    // --- FUNÇÃO DE CRIAR CARD ---
+    function criarCardHTML(tarefa) {
+        let colunaId = '';
+        if(tarefa.status === 'a_fazer') colunaId = 'col-fazer';
+        else if(tarefa.status === 'em_andamento') colunaId = 'col-andamento';
+        else if(tarefa.status === 'concluido') colunaId = 'col-concluido';
+        if(!colunaId) return;
+
+        const tag = tarefa.etiqueta || 'Geral';
+        const bgCor = gerarCorPorTexto(tag);
+        const txtCor = gerarCorTexto(tag);
+        const tagHtml = `<span class="kb-tag" style="background-color: ${bgCor}; color: ${txtCor};">${tag}</span>`;
+
+        let classePrioridade = 'kb-p-baixa';
+        if(tarefa.prioridade === 'alta') classePrioridade = 'kb-p-alta';
+        if(tarefa.prioridade === 'media') classePrioridade = 'kb-p-media';
+
+        let htmlPrazo = `<small class="text-muted"><i class="far fa-calendar"></i> ${tarefa.prazo_fmt || '-'}</small>`;
+        let classeAtraso = '';
+
+        if(tarefa.data_prazo && tarefa.status !== 'concluido') {
+            const hoje = new Date().toISOString().split('T')[0];
+            let prazoBanco = tarefa.data_prazo;
+            if(prazoBanco.length > 10) prazoBanco = prazoBanco.substring(0, 10);
+
+            if(prazoBanco < hoje) {
+                htmlPrazo = `<small class="text-danger fw-bold" style="font-size: 0.8rem;"><i class="fas fa-exclamation-triangle"></i> ${tarefa.prazo_fmt}</small>`;
+                classeAtraso = 'border border-danger border-2';
+            }
+        }
+
+        const menuHtml = `
+            <div class="dropdown">
+                <button class="kb-card-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" onclick="event.stopPropagation()">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow">
+                    <li><a class="dropdown-item" href="#" onclick="editarTarefa(${tarefa.id}); return false;"><i class="fas fa-edit me-2 text-primary"></i>Editar</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="abrirDetalhes(${tarefa.id}, '${tag}', '${tarefa.titulo}'); return false;"><i class="fas fa-eye me-2"></i>Ver / Comentar</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="#" onclick="excluirTarefa(${tarefa.id}); return false;"><i class="fas fa-trash me-2"></i>Excluir</a></li>
+                </ul>
+            </div>
+        `;
+
+        const html = `
+            <div class="kb-card ${classePrioridade} ${classeAtraso}" data-id="${tarefa.id}" onclick="abrirDetalhes(${tarefa.id}, '${tag}', '${tarefa.titulo}')">
+                ${menuHtml}
+                <div class="mt-2">${tagHtml}</div>
+                <div class="kb-card-title pe-4">${tarefa.titulo}</div>
+                <div class="kb-card-footer mt-2">
+                    ${htmlPrazo}
+                    <div class="kb-avatar">${tarefa.prioridade.charAt(0).toUpperCase()}</div>
+                </div>
+            </div>
+        `;
+        document.getElementById(colunaId).innerHTML += html;
+    }
+    // --- FUNÇÃO PARA CARREGAR TIPOS DE ATENDIMENTO (ROTA 3) ---
+    function carregarTiposAtendimento() {
+        fetch('/api/kanban/tipos_atendimento')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('input-tipo-atendimento');
+                if (!select) return; // Segurança caso mude de tela
+
+                // Limpa e coloca a opção padrão
+                select.innerHTML = '<option value="" selected disabled>Selecione um tipo...</option>';
+
+                // Preenche com os dados do banco
+                data.forEach(item => {
+                    // item.id e item.nome vêm do seu SELECT SQL
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.textContent = item.nome;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Erro ao buscar tipos:', error);
+                const select = document.getElementById('input-tipo-atendimento');
+                if(select) select.innerHTML = '<option value="">Erro ao carregar</option>';
+            });
+    }
+
+    // --- DETALHES ---
+    function abrirDetalhes(id, etiqueta, titulo) {
+        if(event && event.target.closest('.dropdown')) return;
+
+        document.getElementById('detalheTarefaId').value = id;
+        document.getElementById('detalheTitulo').innerText = titulo;
+        document.getElementById('detalheEtiqueta').innerText = etiqueta;
+
+        document.getElementById('detalheDescricao').innerText = "Carregando informações...";
+        document.getElementById('detalhePrazo').innerText = "...";
+        document.getElementById('detalhePrioridade').innerText = "...";
+        document.getElementById('listaEquipe').innerHTML = '';
+        document.getElementById('areaEquipeVinculada').classList.add('d-none');
+
+        var modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
+        modal.show();
+
+        fetch(`/api/kanban/tarefa/${id}`)
+            .then(res => res.json())
+            .then(tarefa => {
+                const desc = tarefa.descricao ? tarefa.descricao : "Nenhuma descrição informada.";
+                document.getElementById('detalheDescricao').innerText = desc;
+                document.getElementById('detalhePrioridade').innerText = tarefa.prioridade ? tarefa.prioridade.toUpperCase() : '-';
+
+                let dataFormatada = '-';
+                if (tarefa.data_prazo) {
+                    let partes = tarefa.data_prazo.split('-');
+                    if(partes.length === 3) {
+                        dataFormatada = `${partes[2]}/${partes[1]}/${partes[0]}`;
+                    } else {
+                        dataFormatada = tarefa.data_prazo;
+                    }
+                }
+                document.getElementById('detalhePrazo').innerText = dataFormatada;
+
+                // EQUIPE
+                const areaEquipe = document.getElementById('areaEquipeVinculada');
+                const listaEquipe = document.getElementById('listaEquipe');
+
+                if (tarefa.equipe && tarefa.equipe.length > 0) {
+                    areaEquipe.classList.remove('d-none');
+                    tarefa.equipe.forEach(membro => {
+                        let corStatus = 'text-secondary';
+                        let textoStatus = 'A Fazer';
+                        let iconeStatus = 'fa-circle';
+
+                        if(membro.status === 'em_andamento') {
+                            corStatus = 'text-primary';
+                            textoStatus = 'Em Andamento';
+                            iconeStatus = 'fa-spinner fa-spin';
+                        }
+                        if(membro.status === 'concluido') {
+                            corStatus = 'text-success';
+                            textoStatus = 'Concluído';
+                            iconeStatus = 'fa-check-circle';
+                        }
+
+                        listaEquipe.innerHTML += `
+                            <li class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
+                                <span>
+                                    <i class="fas fa-user-circle me-2 text-muted"></i>
+                                    <strong>${membro.nome}</strong>
+                                </span>
+                                <span class="${corStatus}" style="font-size: 0.85rem;">
+                                    <i class="fas ${iconeStatus} me-1"></i> ${textoStatus}
+                                </span>
+                            </li>
+                        `;
+                    });
+                }
+            })
+            .catch(err => {
+                document.getElementById('detalheDescricao').innerText = "Erro ao carregar detalhes.";
+                console.error(err);
+            });
+
+        carregarComentarios(id);
+    }
+
+    function carregarComentarios(id) {
+        fetch(`/api/kanban/comentarios/${id}`)
+            .then(res => res.json())
+            .then(data => {
+                const box = document.getElementById('listaComentarios');
+                box.innerHTML = '';
+                if(data.length === 0) {
+                    box.innerHTML = '<p class="text-muted text-center small">Nenhum comentário ainda.</p>';
+                    return;
+                }
+                data.forEach(c => {
+                    box.innerHTML += `
+                        <div class="comentario-box">
+                            <div class="comentario-header">
+                                <strong>${c.nome}</strong>
+                                <span>${c.data_fmt}</span>
+                            </div>
+                            <div class="comentario-texto">${c.comentario}</div>
+                        </div>
+                    `;
+                });
+            });
+    }
+
+    function enviarComentario() {
+        const id = document.getElementById('detalheTarefaId').value;
+        const texto = document.getElementById('inputNovoComentario').value;
+        if(!texto) return;
+
+        fetch('/api/kanban/adicionar_comentario', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ tarefa_id: id, texto: texto })
+        })
+        .then(res => res.json())
+        .then(resp => {
+            if(resp.sucesso) {
+                document.getElementById('inputNovoComentario').value = '';
+                carregarComentarios(id);
+            } else {
+                mostrarNotificacao('Erro: ' + resp.erro, 'erro');
+            }
+        });
+    }
+
+    // --- FUNÇÕES DE EDIÇÃO ---
+    function editarTarefa(id) {
+        event.stopPropagation();
+
+        fetch('/api/kanban/tipos_atendimento')
+            .then(res => res.json())
+            .then(tipos => {
+                const select = document.getElementById('editTipoAtendimento');
+                select.innerHTML = '';
+                tipos.forEach(t => {
+                    select.innerHTML += `<option value="${t.id}">${t.nome}</option>`;
+                });
+                return fetch(`/api/kanban/tarefa/${id}`);
+            })
+            .then(res => res.json())
+            .then(tarefa => {
+                document.getElementById('editId').value = tarefa.id;
+                document.getElementById('editTitulo').value = tarefa.titulo;
+                document.getElementById('editEtiqueta').value = tarefa.etiqueta || 'Geral';
+                document.getElementById('editPrioridade').value = tarefa.prioridade;
+                document.getElementById('editPrazo').value = tarefa.data_prazo ? tarefa.data_prazo.substring(0, 10) : '';
+                document.getElementById('editDescricao').value = tarefa.descricao || '';
+                if(tarefa.tipo_atendimento_id) {
+                    document.getElementById('editTipoAtendimento').value = tarefa.tipo_atendimento_id;
+                }
+                carregarTagsSugestao();
+                var modal = new bootstrap.Modal(document.getElementById('modalEditarTarefa'));
+                modal.show();
+            })
+            .catch(err => alert("Erro ao carregar tarefa: " + err));
+    }
+
+    function salvarEdicaoTarefa() {
+        // 1. Liga o Loading
+        alternarLoading('btnSalvarEdicao', true);
+
+        const dados = {
+            id: document.getElementById('editId').value,
+            titulo: document.getElementById('editTitulo').value,
+            etiqueta: document.getElementById('editEtiqueta').value,
+            tipo_atendimento_id: document.getElementById('editTipoAtendimento').value,
+            prioridade: document.getElementById('editPrioridade').value,
+            data_prazo: document.getElementById('editPrazo').value,
+            descricao: document.getElementById('editDescricao').value
+        };
+
+        if(!dados.titulo) {
+            mostrarNotificacao("O título é obrigatório", 'erro');
+            alternarLoading('btnSalvarEdicao', false); // Desliga loading
+            return;
+        }
+
+        fetch('/api/kanban/editar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(dados)
+        })
+        .then(res => res.json())
+        .then(resp => {
+            if(resp.sucesso) {
+                mostrarNotificacao('Tarefa atualizada!');
+                var modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarTarefa'));
+                modal.hide();
+                irParaKanban(colaboradorAtualId, document.getElementById('lbl-colaborador').innerText);
+            } else {
+                mostrarNotificacao("Erro ao editar: " + resp.erro, 'erro');
+            }
+        })
+        .catch(err => {
+            mostrarNotificacao("Erro de conexão.", 'erro');
+        })
+        .finally(() => {
+            // 2. Desliga o Loading
+            alternarLoading('btnSalvarEdicao', false);
+        });
+    }
+
+    function excluirTarefa(id) {
+        if(event) event.stopPropagation();
+        if(!confirm("Tem certeza que deseja excluir esta tarefa?")) return;
+
+        fetch('/api/kanban/excluir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.sucesso) {
+                // SUCESSO
+                mostrarNotificacao('Tarefa excluída.');
+
+                const card = document.querySelector(`.kb-card[data-id="${id}"]`);
+                if(card) card.remove();
+            } else {
+                // ERRO
+                mostrarNotificacao("Erro ao excluir: " + data.erro, 'erro');
+            }
+        });
+    }
+
+    function moverTarefa(id, status) {
+        fetch('/api/kanban/mover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, status: status })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.erro) {
+                alert("Erro ao mover: " + data.erro);
+                irParaKanban(colaboradorAtualId, document.getElementById('lbl-colaborador').innerText);
+            }
+        });
+    }
+
+    // --- SELEÇÃO DE EQUIPE (MODAL) ---
+    function abrirModalSelecaoEquipe() {
+        if(listaTodosUsuariosCache.length === 0) {
+            document.getElementById('listaTodosColaboradores').innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>';
+
+            fetch('/api/kanban/colaboradores_todos')
+            .then(res => res.json())
+            .then(data => {
+                listaTodosUsuariosCache = data;
+                renderizarListaEquipe(data);
+            });
+        } else {
+            renderizarListaEquipe(listaTodosUsuariosCache);
+        }
+        var modalEquipe = new bootstrap.Modal(document.getElementById('modalSelecaoEquipe'));
+        modalEquipe.show();
+    }
+
+    function renderizarListaEquipe(lista) {
+        const container = document.getElementById('listaTodosColaboradores');
+        container.innerHTML = '';
+
+        const valorAtual = document.getElementById('idsEquipeSelecionada').value;
+        const idsJaSelecionados = valorAtual ? valorAtual.split(',').map(Number) : [];
+
+        lista.forEach(c => {
+            if(c.id == colaboradorAtualId) return; // Não mostra o próprio usuário
+
+            const isChecked = idsJaSelecionados.includes(c.id) ? 'checked' : '';
+
+            container.innerHTML += `
+                <label class="list-group-item d-flex gap-3">
+                    <input class="form-check-input flex-shrink-0 check-equipe-todos" type="checkbox" value="${c.id}" data-nome="${c.nome}" ${isChecked}>
+                    <span>${c.nome}</span>
+                </label>
+            `;
+        });
+    }
+
+    function filtrarListaEquipe() {
+        const termo = document.getElementById('buscaColaboradorEquipe').value.toLowerCase();
+        const filtrados = listaTodosUsuariosCache.filter(c => c.nome.toLowerCase().includes(termo));
+        renderizarListaEquipe(filtrados);
+    }
+
+    function fecharModalSelecaoEquipe() {
+        const el = document.getElementById('modalSelecaoEquipe');
+        const modal = bootstrap.Modal.getInstance(el);
+        modal.hide();
+    }
+
+    function confirmarSelecaoEquipe() {
+        let ids = [];
+        let nomes = [];
+
+        document.querySelectorAll('.check-equipe-todos:checked').forEach(chk => {
+            ids.push(chk.value);
+            nomes.push(chk.getAttribute('data-nome'));
+        });
+
+        document.getElementById('idsEquipeSelecionada').value = ids.join(',');
+
+        const divNomes = document.getElementById('nomesEquipeSelecionada');
+        if(nomes.length > 0) {
+            divNomes.innerHTML = `<strong>+ ${nomes.length} pessoa(s):</strong> ${nomes.join(', ')}`;
+            divNomes.classList.remove('text-muted', 'fst-italic');
+            divNomes.classList.add('text-primary');
+        } else {
+            divNomes.innerHTML = 'Nenhum extra selecionado.';
+            divNomes.classList.add('text-muted', 'fst-italic');
+            divNomes.classList.remove('text-primary');
+        }
+
+        fecharModalSelecaoEquipe();
+    }
+
+    // --- NOVA TAREFA (FINAL) ---
+    function abrirModalTarefa() {
+        if(!colaboradorAtualId) {
+            alert("Erro: Nenhum colaborador selecionado.");
+            return;
+        }
+
+        // Reseta seleção de equipe
+        document.getElementById('idsEquipeSelecionada').value = '';
+        document.getElementById('nomesEquipeSelecionada').innerText = 'Nenhum extra selecionado.';
+        document.getElementById('nomesEquipeSelecionada').className = 'small text-muted fst-italic p-2 bg-light border rounded';
+
+        // Carrega Tipos
+        fetch('/api/kanban/tipos_atendimento')
+            .then(res => res.json())
+            .then(tipos => {
+                const select = document.getElementById('selectTipoAtendimento');
+                select.innerHTML = '<option value="" selected disabled>Selecione...</option>';
+                tipos.forEach(t => {
+                    select.innerHTML += `<option value="${t.id}">${t.nome}</option>`;
+                });
+            });
+
+        document.getElementById('formNovaTarefa').reset();
+        var myModal = new bootstrap.Modal(document.getElementById('modalNovaTarefa'));
+        myModal.show();
+    }
+
+    // --- FUNÇÃO DE SALVAR TAREFA (COM ANEXO) ---
+    function salvarNovaTarefa() {
+        // 1. Pegar os inputs
+        const titulo = document.getElementById('input-titulo').value;
+        const desc = document.getElementById('input-descricao').value;
+        const prio = document.getElementById('input-prioridade').value;
+        const prazo = document.getElementById('input-prazo').value;
+
+        // Pega o Tipo de Atendimento (Agora vai estar preenchido)
+        const tipoSelect = document.getElementById('input-tipo-atendimento');
+        const tipo = tipoSelect.value;
+
+        // 2. Pegar responsável
+        const selectResp = document.getElementById('input-responsavel');
+        // Proteção caso o select não exista
+        if (!selectResp) { alert('Erro interno: Campo responsável não encontrado'); return; }
+
+        const responsaveis = Array.from(selectResp.selectedOptions).map(opt => opt.value);
+
+        // --- POP-UP DE VALIDAÇÃO (Este já estava ok) ---
+        if (!titulo || responsaveis.length === 0 || !tipo) {
+            alert('Atenção: Preencha o Título, o Responsável e o Tipo de Atendimento.');
+            return;
+        }
+
+        // 3. Montar FormData
+        const formData = new FormData();
+        formData.append('titulo', titulo);
+        formData.append('descricao', desc);
+        formData.append('prioridade', prio);
+        formData.append('data_prazo', prazo);
+        formData.append('tipo_atendimento_id', tipo);
+
+        responsaveis.forEach(id => {
+            formData.append('colaborador_id', id);
+        });
+
+        // 4. Arquivo
+        const fileInput = document.getElementById('input-anexo');
+        if (fileInput.files[0]) {
+            formData.append('arquivo_anexo', fileInput.files[0]);
+        }
+
+        // Feedback visual no botão
+        const btnSalvar = document.querySelector('#modal-nova-tarefa .btn-primary');
+        const textoOriginal = btnSalvar.innerText;
+        btnSalvar.innerText = 'Salvando...';
+        btnSalvar.disabled = true;
+
+        // 5. Envio
+        fetch('/api/kanban/nova_tarefa', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.sucesso) {
+                // --- POP-UP DE SUCESSO (ESTAVA COMENTADO) ---
+                alert('Tarefa criada com sucesso!');
+
+                // Fecha modal e limpa
+                const modalEl = document.getElementById('modal-nova-tarefa');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+                document.getElementById('form-nova-tarefa').reset();
+
+                // Recarrega a tela
+                if (colaboradorAtualId) {
+                    carregarKanban(colaboradorAtualId);
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                // --- POP-UP DE ERRO DO SERVIDOR ---
+                alert('Erro ao criar: ' + (data.erro || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro de conexão ao salvar tarefa.');
+        })
+        .finally(() => {
+            btnSalvar.innerText = textoOriginal;
+            btnSalvar.disabled = false;
+        });
+    }
+
+    // --- FILTRO DE BUSCA ---
+    function filtrarTarefas() {
+        const termo = document.getElementById('filtroBusca').value.toLowerCase();
+        document.querySelectorAll('.kb-card').forEach(card => {
+            const txt = card.innerText.toLowerCase();
+            card.style.display = txt.includes(termo) ? 'block' : 'none';
+        });
+    }
+
+    // --- HISTÓRICO ---
+    function abrirHistorico() {
+        if(!colaboradorAtualId) return;
+        const tbody = document.getElementById('lista-historico');
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center p-3">Carregando...</td></tr>';
+
+        var modalHist = new bootstrap.Modal(document.getElementById('modalHistorico'));
+        modalHist.show();
+
+        fetch(`/api/kanban/historico/${colaboradorAtualId}`)
+            .then(res => res.json())
+            .then(data => {
+                tbody.innerHTML = '';
+                if(data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted p-3">Nenhuma tarefa concluída no histórico.</td></tr>';
+                    return;
+                }
+                data.forEach(t => {
+                    let badge = '';
+                    if(t.prioridade === 'alta') badge = '<span class="badge bg-danger">Alta</span>';
+                    else if(t.prioridade === 'media') badge = '<span class="badge bg-warning text-dark">Média</span>';
+                    else badge = '<span class="badge bg-success">Baixa</span>';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${t.titulo}</td>
+                            <td>${t.data_fmt || '-'}</td>
+                            <td>${badge}</td>
+                        </tr>
+                    `;
+                });
+            });
+    }
+
+    // --- NAVEGAÇÃO ---
+    function navegar(telaId) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(telaId).classList.add('active');
+        historico.push(telaId);
+        document.getElementById('btn-voltar').style.display = 'block';
+    }
+
+    function voltar() {
+        if (historico.length > 1) {
+            historico.pop();
+            let anterior = historico[historico.length - 1];
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(anterior).classList.add('active');
+            if(historico.length === 1) document.getElementById('btn-voltar').style.display = 'none';
+        }
+    }
+</script>
+
+{% endblock %}

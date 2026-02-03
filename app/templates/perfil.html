@@ -3,34 +3,96 @@
 {% block title %}Meu Perfil{% endblock %}
 
 {% block content %}
-    <h1 class="page-title"><i class="fas fa-user-circle icon-title"></i> Meu Perfil</h1>
+<div class="container py-4">
+    <h1 class="page-title mb-4"><i class="fas fa-user-circle icon-title"></i> Meu Perfil</h1>
 
-    <div class="info-card profile-card">
-        <div class="profile-header">
-            <h3>Informações do Colaborador</h3>
+    <div class="info-card profile-card shadow-sm">
+
+        <div class="profile-header text-center pb-3 border-bottom" style="background-color: #f8f9fa;">
+            <h3 class="pt-3 mb-4">Informações do Colaborador</h3>
+
+            <form action="{{ url_for('perfil') }}" method="POST" enctype="multipart/form-data" id="form-avatar">
+
+                <div class="position-relative d-inline-block">
+                    {% if colaborador.foto_perfil %}
+                        <img src="{{ url_for('static', filename=colaborador.foto_perfil) }}"
+                             alt="Foto de Perfil"
+                             class="rounded-circle border border-3 border-white shadow-sm"
+                             style="width: 130px; height: 130px; object-fit: cover;">
+                    {% else %}
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center border border-3 border-white shadow-sm mx-auto"
+                             style="width: 130px; height: 130px; font-size: 3.5rem; user-select: none;">
+                            {{ colaborador.nome[0] }}
+                        </div>
+                    {% endif %}
+
+                    <div class="position-absolute bottom-0 end-0">
+                        <label for="input-foto" class="btn btn-dark btn-sm rounded-circle shadow-sm"
+                               style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; cursor: pointer;"
+                               title="Alterar foto">
+                            <i class="fas fa-camera"></i>
+                        </label>
+                    </div>
+                </div>
+
+                <input type="file" name="foto" id="input-foto"
+                       style="display: none;"
+                       accept="image/png, image/jpeg, image/jpg, image/gif"
+                       onchange="document.getElementById('form-avatar').submit()">
+            </form>
+        </div>
+        <div class="profile-body p-4">
+            <div class="row g-3">
+                <div class="col-md-12 border-bottom pb-2 mb-2">
+                    <p class="mb-1"><strong class="text-muted text-uppercase small">Nome Completo</strong></p>
+                    <p class="fs-5 text-dark">{{ colaborador.nome }}</p>
+                </div>
+
+                <div class="col-md-6">
+                    <p class="mb-1"><strong class="text-muted text-uppercase small">Usuário</strong></p>
+                    <p>{{ colaborador.usuario }}</p>
+                </div>
+
+                <div class="col-md-6">
+                    <p class="mb-1"><strong class="text-muted text-uppercase small">E-mail</strong></p>
+                    <p>{{ colaborador.email }}</p>
+                </div>
+
+                <div class="col-md-6">
+                    <p class="mb-1"><strong class="text-muted text-uppercase small">Setor</strong></p>
+                    <p>{{ colaborador.nome_setor }}</p>
+                </div>
+
+                <div class="col-md-6">
+                    <p class="mb-1"><strong class="text-muted text-uppercase small">Gestor do Setor</strong></p>
+                    <p>
+                    {% if colaborador.nome_gestor %}
+                        {{ colaborador.nome_gestor }}
+                    {% else %}
+                        <span class="text-muted fst-italic">Não definido</span>
+                    {% endif %}
+                    </p>
+                </div>
+
+                <div class="col-md-6">
+                    <p class="mb-1"><strong class="text-muted text-uppercase small">Função</strong></p>
+                    <p>{{ colaborador.nome_perfil }}</p>
+                </div>
+
+                <div class="col-md-6">
+                    <p class="mb-1"><strong class="text-muted text-uppercase small">Status</strong></p>
+                    <span class="badge {{ 'bg-success' if colaborador.status == 'Ativo' else 'bg-danger' }}">
+                        {{ colaborador.status }}
+                    </span>
+                </div>
+            </div>
         </div>
 
-        <div class="profile-body">
-            <p><strong>Nome Completo:</strong> {{ colaborador.nome }}</p>
-            <p><strong>Usuário:</strong> {{ colaborador.usuario }}</p>
-            <p><strong>E-mail:</strong> {{ colaborador.email }}</p>
-            <p><strong>Setor:</strong> {{ colaborador.nome_setor }}</p>
-            <p>
-            <strong>Gestor do Setor:</strong>
-            {% if colaborador.nome_gestor %}
-                {{ colaborador.nome_gestor }}
-            {% else %}
-                <span style="color: #999;">Não definido</span>
-            {% endif %}
-            </p>
-            <p><strong>Função:</strong> {{ colaborador.nome_perfil }}</p>
-            <p><strong>Status:</strong> <span class="status-badge status-{{ colaborador.status|lower }}">{{ colaborador.status }}</span></p>
-        </div>
-
-        <div class="profile-actions">
-            <a href="{{ url_for('alterar_senha') }}" class="btn btn-primary">
-                <i class="fas fa-key"></i> Alterar Senha
+        <div class="profile-actions p-3 bg-light border-top text-end">
+            <a href="{{ url_for('alterar_senha') }}" class="btn btn-outline-primary">
+                <i class="fas fa-key me-2"></i> Alterar Senha
             </a>
         </div>
     </div>
+</div>
 {% endblock %}

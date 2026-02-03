@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- ======================= CSS PRINCIPAIS ======================= -->
     <!-- Seu estilo principal -->
@@ -19,6 +20,9 @@
 
     <!-- Ícone do sistema -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/icone.png') }}">
+
+
+    {% block head %}{% endblock %}
 </head>
 
 <body>
@@ -31,12 +35,26 @@
 
         <nav class="header-right">
             {% if session['colaborador_id'] %}
-                <div class="user-profile-menu">
+
+                <div class="dropdown d-inline-block me-3">
+
+                    <a href="#" class="notification-wrapper position-relative" id="btn-notificacoes"
+                       data-bs-toggle="dropdown" aria-expanded="false" title="Ver Tarefas">
+                        <i class="fas fa-bell"></i>
+                        <span id="badge-notificacao" class="notification-badge" style="display: none;">0</span>
+                    </a>
+
+                    <ul class="dropdown-menu dropdown-menu-end shadow" id="lista-notificacoes" aria-labelledby="btn-notificacoes">
+                    </ul>
+                </div>
+
+                <div class="user-profile-menu d-inline-block">
                     <span class="user-info">Olá, {{ session['colaborador_nome'] }}</span>
                     <a href="{{ url_for('logout') }}" class="btn-logout">
                         <i class="fas fa-sign-out-alt"></i> Sair
                     </a>
                 </div>
+
             {% endif %}
         </nav>
     </header>
@@ -63,9 +81,10 @@
 
                 <li>
                     <a href="#" class="sidebar-title">ATIVIDADES</a>
-                    <ul class="sidebar-submenu {{ 'hidden' if request.endpoint not in ['registrar_atividade', 'historico'] else '' }}">
+                    <ul class="sidebar-submenu {{ 'hidden' if request.endpoint not in ['registrar_atividade', 'historico', 'kanban'] else '' }}">
                         <li><a href="{{ url_for('registrar_atividade') }}" class="{{ 'active' if request.endpoint == 'registrar_atividade' else '' }}">Registrar Atividade</a></li>
                         <li><a href="{{ url_for('historico') }}" class="{{ 'active' if request.endpoint == 'historico' else '' }}">Histórico</a></li>
+                        <li><a href="{{ url_for('kanban') }}" class="{{ 'active' if request.endpoint == 'kanban' else '' }}">Tarefas</a></li>
                     </ul>
                 </li>
 
@@ -147,10 +166,12 @@
     </div>
 
     <!-- ======================= SCRIPTS ======================= -->
-    <!-- JS principal do sistema -->
-    <script src="{{ url_for('static', filename='main.js') }}" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
 
-    <!-- JS com funções específicas da página de atendimento (PDS, modais etc.) -->
+    <script src="{{ url_for('static', filename='notificacoes.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='main.js') }}" defer></script>
     <script src="{{ url_for('static', filename='estilo_pds.js') }}" defer></script>
 
 </body>

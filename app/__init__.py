@@ -24,6 +24,22 @@ app = Flask(__name__)
 # expor segredos diretamente no código-fonte.
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 
+# --- Configuração de Uploads de Anexos ---
+# Define o caminho absoluto para salvar: pasta_do_projeto/app/static/uploads/anexos
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'app/static/uploads/anexos')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Cria a pasta automaticamente se ela não existir (evita erro de "file not found")
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# ------------------------------------------------
+
+# Cria uma configuração separada para não misturar com as tarefas
+UPLOAD_FOLDER_PERFIS = os.path.join(os.getcwd(), 'app/static/uploads/perfis')
+app.config['UPLOAD_FOLDER_PERFIS'] = UPLOAD_FOLDER_PERFIS
+
+# Garante que a pasta de perfis também exista
+os.makedirs(app.config['UPLOAD_FOLDER_PERFIS'], exist_ok=True)
+# ------------------------------------------------
 # [3] Importação Tardia (Circular Import Handling)
 # O módulo 'routes' é importado no final do arquivo, e não no topo.
 # Isso é intencional e necessário para evitar uma "importação circular".

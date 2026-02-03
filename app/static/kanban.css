@@ -1,0 +1,441 @@
+/* =========================================
+   ESTILOS DOS CARDS DE NAVEGAÇÃO (SETORES/COLABORADORES)
+   ========================================= */
+
+.kb-nav-card {
+    background-color: #ffffff;
+    border: 2px solid #cfe2ff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02),
+                0 1px 3px rgba(13, 110, 253, 0.05);
+
+    /* --- A MÁGICA DE ALINHAMENTO --- */
+    height: 100%;
+    min-height: 220px;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    cursor: pointer;
+}
+
+/* Remove qualquer elemento extra antigo */
+.kb-nav-card::before {
+    display: none;
+}
+
+/* Efeito ao passar o mouse (Hover) */
+.kb-nav-card:hover {
+    transform: translateY(-6px);
+    border-color: #9ec5fe;
+    box-shadow: 0 12px 24px rgba(13, 110, 253, 0.12),
+                0 4px 8px rgba(0, 0, 0, 0.02);
+}
+
+/* --- AJUSTE DO NOME (Permitir quebra de linha) --- */
+.kb-nav-card h6 {
+    white-space: normal !important;
+    word-wrap: break-word;
+    text-overflow: clip;
+    text-align: center;
+    width: 100%;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    font-size: 0.95rem;
+    line-height: 1.3;
+    font-weight: 700;
+    color: #495057;
+}
+
+/* --- TEXTO "VER QUADRO" VIRANDO BOTÃO --- */
+.kb-nav-card small {
+    background-color: #e7f1ff;
+    color: #0d6efd;
+    border: 1px solid #dae7ff;
+    padding: 6px 16px;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-top: 10px;
+    display: inline-block;
+    transition: all 0.2s ease;
+}
+
+.kb-nav-card:hover small {
+    background-color: #0d6efd;
+    color: #ffffff;
+    border-color: #0d6efd;
+    box-shadow: 0 4px 6px rgba(13, 110, 253, 0.2);
+}
+
+/* Ícone do Setor/Colaborador */
+.kb-nav-card i {
+    color: #0d6efd;
+    font-size: 2.5em !important;
+    margin-bottom: 5px;
+    filter: none;
+    transition: transform 0.3s ease;
+}
+
+.kb-nav-card:hover i {
+    transform: scale(1.1);
+}
+
+/* Badge (Contador de Tarefas) */
+.kb-badge {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #e9ecef;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 15px;
+}
+
+/* =========================================
+   ESTILO PARA GRUPO DE AVATARES (VISÃO MASTER)
+   ========================================= */
+
+.avatar-group {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.avatar-group .kb-avatar-mini {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    border: 2px solid #fff;
+    margin-left: -8px;
+    background-color: #ccc;
+}
+
+.avatar-group .kb-avatar-mini:nth-child(odd) { background-color: #0d6efd; }
+.avatar-group .kb-avatar-mini:nth-child(even) { background-color: #fd7e14; }
+
+/* =========================================
+   ELEMENTOS GERAIS (COLABORADOR / KANBAN)
+   ========================================= */
+
+/* Avatar Grande (Seleção de Colaborador) */
+.kb-avatar-grande {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    color: #495057;
+    font-size: 24px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #dee2e6;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* =========================================
+   ESTILOS DO QUADRO KANBAN (COLUNAS E TAREFAS)
+   ========================================= */
+
+.kb-column {
+    background-color: #f0f2f5; /* Cinza Nuvem */
+    border: 2px solid rgba(0, 0, 0, 0.10); /* Borda Levemente Preta */
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- CABEÇALHOS DAS COLUNAS --- */
+.kb-column-header {
+    padding: 10px 15px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Cores dos cabeçalhos */
+.header-todo { background-color: #e2e6ea; color: #495057; }
+.header-doing { background-color: #fff3cd; color: #856404; }
+.header-done { background-color: #d1e7dd; color: #0f5132; }
+
+/* --- ÁREA DE LISTA --- */
+.kb-task-list {
+    min-height: 100px;
+    padding-bottom: 20px;
+}
+
+/* =========================================
+   CARD DE TAREFA (COM SISTEMA SEMÁFORO)
+   ========================================= */
+
+.kb-task-card {
+    background-color: #ffffff;
+    border: 2px solid #cfe2ff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+
+    padding: 16px;
+    padding-left: 20px;
+    margin-bottom: 12px;
+    cursor: grab;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* --- BARRA LATERAL DE PRIORIDADE (Visual Rápido) --- */
+.kb-task-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 6px;
+    background-color: #ccc;
+}
+
+/* Efeito Hover */
+.kb-task-card:hover {
+    transform: translateY(-4px);
+    border-color: #9ec5fe;
+    box-shadow: 0 12px 24px rgba(13, 110, 253, 0.12);
+}
+
+/* Título */
+.kb-task-card .task-title {
+    font-weight: 700;
+    color: #495057;
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* --- BADGES (Pílulas) ESTILO SEMÁFORO --- */
+.badge-priority {
+    font-size: 0.7rem;
+    padding: 4px 12px;
+    border-radius: 50px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+
+/* === CORES DAS PRIORIDADES (ESCALA AJUSTADA) === */
+
+/* 1. URGENTE (Roxo/Violeta) */
+.priority-urgente .badge-priority {
+    background-color: #e0cffc;
+    color: #4c0bce;
+}
+.kb-task-card.priority-urgente::before {
+    background-color: #6f42c1;
+}
+
+/* 2. ALTA (Vermelho) */
+.priority-alta .badge-priority {
+    background-color: #f8d7da;
+    color: #842029;
+}
+.kb-task-card.priority-alta::before {
+    background-color: #dc3545;
+}
+
+/* 3. MÉDIA (Amarelo Ouro) */
+.priority-media .badge-priority {
+    background-color: #fff3cd;
+    color: #664d03;
+}
+.kb-task-card.priority-media::before {
+    background-color: #ffc107;
+}
+
+/* 4. BAIXA (Verde) */
+.priority-baixa .badge-priority {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+.kb-task-card.priority-baixa::before {
+    background-color: #198754;
+}
+
+/* Rodapé */
+.task-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #f0f2f5;
+    color: #6c757d;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Utilitário para o ícone de editar (que faltava) */
+.hover-blue:hover {
+    color: #0d6efd !important;
+    transform: scale(1.2);
+    transition: transform 0.2s ease;
+}
+
+/* Ajuste para o Editor Quill */
+.ql-toolbar {
+    border-radius: 5px 5px 0 0;
+    background-color: #f8f9fa; /* Cinza claro estilo bootstrap */
+}
+.ql-container {
+    border-radius: 0 0 5px 5px;
+    font-family: inherit; /* Usa a fonte do seu site, não a padrão do Quill */
+    font-size: 1rem;
+}
+
+/* =========================================
+   ESTILOS ESPECÍFICOS DOS MODAIS E LAYOUT
+   (ADICIONADOS RECENTEMENTE)
+   ========================================= */
+
+/* --- 1. MODAL MAIS LARGO (90% DA TELA) --- */
+.modal-xxl-custom {
+    max-width: 90vw !important; /* Ocupa 90% da largura da viewport */
+    width: 90vw !important;
+}
+
+/* --- 2. CABEÇALHOS E RODAPÉS MAIS LIMPOS --- */
+.modal-header {
+    border-bottom: 1px solid #eee;
+    background-color: #fff;
+}
+.modal-footer {
+    border-top: 1px solid #eee;
+}
+
+/* --- 3. ÁREA DE ATIVIDADE (COMENTÁRIOS E EQUIPE) --- */
+/* Fundo cinza clarinho para separar visualmente do resto */
+.bg-activity {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+/* --- 4. CARD DE ANEXO (VISUAL DELICADO) --- */
+.attachment-card {
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    padding: 8px 12px;
+    background-color: #fff;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+.attachment-card:hover {
+    border-color: #0d6efd;
+    background-color: #f0f8ff;
+}
+
+/* --- 5. EDITOR DE TEXTO REDUZIDO NO MODAL DE EDIÇÃO --- */
+#editor-container-edit {
+    height: 120px !important; /* Força altura menor */
+    background: white;
+}
+
+/* --- 6. AVATAR DE COMENTÁRIO (Opcional) --- */
+.comment-avatar {
+    width: 32px;
+    height: 32px;
+    background: #e9ecef;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+}
+
+/* =========================================
+   AJUSTE FINAL: LARGURA E CENTRALIZAÇÃO
+   ========================================= */
+
+/* 1. Força os modais a serem LARGOS (Horizontais) */
+#modalEditarTarefa .modal-dialog,
+#modalNovaTarefa .modal-dialog {
+    max-width: 90vw !important;  /* 90% da largura da janela */
+    width: 90vw !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* 2. Trava largura máxima em telas gigantes (Opcional) */
+@media (min-width: 1600px) {
+    #modalEditarTarefa .modal-dialog,
+    #modalNovaTarefa .modal-dialog {
+        max-width: 1400px !important;
+    }
+}
+
+/* 3. FORÇA A CENTRALIZAÇÃO VERTICAL E HORIZONTAL */
+/* Isso garante que o modal fique exatamente no meio da tela */
+.modal-dialog-centered {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 100vh !important; /* Ocupa toda altura da tela para poder centralizar */
+    margin: 0 auto !important;    /* Garante centro horizontal */
+}
+
+/* Garante que o conteúdo do modal não encolha */
+.modal-content {
+    width: 100% !important;
+}
+
+/* Grupo de Avatares no Card Master */
+.kb-avatar-group {
+    display: flex;
+    align-items: center;
+    padding-left: 10px; /* Espaço para o primeiro avatar não cortar */
+}
+
+.kb-avatar-group .kb-avatar-small {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid #fff; /* Borda branca para separar */
+    background-color: #e9ecef;
+    color: #495057;
+    font-size: 0.75rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: -10px; /* Faz o overlap (sobreposição) */
+    position: relative;
+    object-fit: cover;
+}
+
+.kb-avatar-group .kb-avatar-small:hover {
+    z-index: 10;
+    transform: translateY(-2px);
+    transition: all 0.2s;
+}

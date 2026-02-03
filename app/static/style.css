@@ -242,12 +242,12 @@ body.sidebar-collapsed .content {
 
 /* --- [2.7] Título Principal da Página --- */
 .page-title {
-    font-size: 1.8rem;
-    font-weight: 700;
+    font-size: 1.2rem;
+    font-weight: 600;
     margin-bottom: 25px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 .page-title i {
     color: var(--primary-color); /* APENAS o ícone fica azul */
@@ -1818,3 +1818,51 @@ body.sidebar-collapsed .content {
         max-width: 150px;
     }
 }
+/* =========================================
+   ESTILOS FINAIS - NOTIFICAÇÕES
+   ========================================= */
+
+/* A caixa da lista */
+#lista-notificacoes {
+    width: 320px !important;
+    max-height: 450px;
+    overflow-y: auto;
+    background-color: #fff !important; /* Garante fundo branco */
+    z-index: 1050 !important; /* Acima de qualquer modal ou tabela */
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 8px;
+    /* Correção de posicionamento */
+    right: 0 !important;
+    left: auto !important;
+    margin-top: 10px;
+}
+
+/* O texto que corta com (...) */
+.text-truncate-notify {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    max-width: 230px; /* Largura máxima do texto */
+    font-size: 0.9rem;
+}
+
+/* Bolinha de contagem */
+.notification-badge {
+    position: absolute;
+    top: -5px; right: -5px;
+    border-radius: 50%;
+    padding: 2px 5px;
+    font-size: 10px;
+    color: white;
+}
+.badge-urgent { background-color: #dc3545; animation: pulse-red 2s infinite; }
+.badge-normal { background-color: #0d6efd; }
+.bell-urgent { color: #dc3545 !important; }
+
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}}

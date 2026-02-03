@@ -2,16 +2,35 @@
 Arquivo: app/routes.py
 Descrição: Módulo principal de roteamento e lógica de negócios (views) da aplicação Flask.
 """
-
+import os
 from functools import wraps
-from flask import session, flash, redirect, url_for, render_template, request, jsonify
-from app import app  # Importa a instância 'app' criada no __init__.py
-from utils.db import Database  # Importa a instância 'db' do nosso módulo DAL
+from flask import session, flash, redirect, url_for, render_template, request, jsonify,current_app
+from app import app
+from utils.db import Database
 import bcrypt
 from datetime import date, datetime, timedelta
 import uuid
 import math
-from app.decorators import admin_required, login_required, gestor_required  # Nossos decorators de permissão
+import json
+from app.decorators import admin_required, login_required, gestor_required
+from werkzeug.utils import secure_filename
+# --- CONFIGURAÇÕES DE ARQUIVOS (CONSTANTES) ---
+# Define quais arquivos sistema aceita (Segurança)
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx'}
+
+def allowed_file(filename):
+    """
+    Verifica se o arquivo tem uma extensão válida.
+    """
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+ALLOWED_EXTENSIONS_PERFIL = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file_perfil(filename):
+    """ Verifica arquivos para PERFIL (Só aceita Imagem) """
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS_PERFIL
 
 # Instancia o banco de dados. Graças ao padrão Singleton no db.py,
 # esta é a mesma instância 'db' usada em toda a aplicação.
@@ -111,23 +130,67 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/perfil')
-@login_required  # Protege a rota: Apenas usuários logados podem ver.
+@app.route('/perfil', methods=['GET', 'POST'])
+@login_required
 def perfil():
     """
-    Exibe a página de perfil do usuário logado, buscando seus dados
-    detalhados no banco de dados.
+    Exibe o perfil e processa o upload da foto.
     """
     colaborador_id = session['colaborador_id']
 
-    # Query mais completa para exibir informações de perfil,
-    # incluindo o nome do setor e do gestor direto.
+    # 1. PROCESSAMENTO DO UPLOAD (Se for POST)
+    if request.method == 'POST':
+        # Verifica se o campo 'foto' veio no formulário
+        if 'foto' not in request.files:
+            flash('Nenhum arquivo enviado.', 'danger')
+            return redirect(request.url)
+
+        file = request.files['foto']
+
+        # Verifica se o usuário selecionou algo
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado.', 'warning')
+            return redirect(request.url)
+
+        # Verifica se é uma IMAGEM válida (Usando a nova função)
+        if file and allowed_file_perfil(file.filename):
+            try:
+                # Gera nome seguro: ID_perfil.extensao (ex: 65_perfil.jpg)
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = secure_filename(f"{colaborador_id}_perfil.{ext}")
+
+                # Salva na pasta de PERFIS (Configurada no __init__.py)
+                caminho_absoluto = os.path.join(app.config['UPLOAD_FOLDER_PERFIS'], filename)
+                file.save(caminho_absoluto)
+
+                # Caminho relativo para o banco
+                caminho_banco = f"uploads/perfis/{filename}"
+
+                # Atualiza Banco
+                query_update = "UPDATE colaboradores SET foto_perfil = %s WHERE id = %s"
+                db.execute_query(query_update, (caminho_banco, colaborador_id))
+
+                # Atualiza Sessão (Para a foto aparecer no menu imediatamente)
+                session['colaborador_foto'] = caminho_banco
+
+                flash('Foto de perfil atualizada com sucesso!', 'success')
+
+            except Exception as e:
+                print(f"Erro ao salvar foto: {e}")
+                flash('Erro interno ao salvar a foto.', 'danger')
+
+            return redirect(url_for('perfil'))
+        else:
+            flash('Arquivo inválido. Use apenas PNG, JPG ou JPEG.', 'danger')
+
+    # 2. EXIBIÇÃO DA PÁGINA (GET)
     query = """
             SELECT 
                 c.id, 
                 c.nome, 
                 c.email, 
                 c.usuario, 
+                c.foto_perfil,
                 p.nome AS nome_perfil,
                 c.status, 
                 s.nome_setor,
@@ -138,7 +201,7 @@ def perfil():
                 setores AS s ON c.setor_id = s.id
             JOIN 
                 perfis AS p ON c.perfil_id = p.id
-            LEFT JOIN -- LEFT JOIN é usado caso um setor não tenha um gestor definido.
+            LEFT JOIN 
                 colaboradores AS gestor ON s.gestor_id = gestor.id
             WHERE 
                 c.id = %s
@@ -146,8 +209,6 @@ def perfil():
     colaborador = db.execute_query(query, (colaborador_id,), fetch='one')
 
     if not colaborador:
-        # Se o usuário não for encontrado (ex: deletado enquanto logado),
-        # força o logout por segurança.
         return redirect(url_for('logout'))
 
     return render_template('perfil.html', colaborador=colaborador)
@@ -1067,16 +1128,36 @@ def dashboard():
             query_colab_setor = "SELECT s.id, s.nome_setor, COUNT(c.id) AS total_colaboradores FROM colaboradores c JOIN setores s ON c.setor_id = s.id WHERE c.status = 'Ativo' GROUP BY s.id, s.nome_setor ORDER BY total_colaboradores DESC;"
             dados_extras['colaboradores_por_setor'] = db.execute_query(query_colab_setor, fetch='all')
 
+            # Volume por setor, KPI de tempo real)
             query_top_atividades = """
                 SELECT ta.nome, COUNT(a.id) AS total 
                 FROM atividades a 
                 JOIN tipos_atendimento ta ON a.tipo_atendimento_id = ta.id 
                 WHERE DATE(a.data_atendimento) BETWEEN %s AND %s 
                 GROUP BY ta.id, ta.nome 
-                ORDER BY total DESC LIMIT 3;
+                ORDER BY total DESC LIMIT 5;
             """
             dados_extras['top_atividades'] = db.execute_query(query_top_atividades, (data_inicio, data_fim),
                                                               fetch='all')
+
+            # --- CORREÇÃO: Usando a tabela 'atividades' e fazendo o JOIN correto via colaboradores ---
+            query_vol_setor = """
+                            SELECT s.nome_setor, COUNT(a.id) as total
+                            FROM setores s
+                            LEFT JOIN colaboradores c ON s.id = c.setor_id
+                            LEFT JOIN atividades a 
+                                ON c.id = a.colaborador_id 
+                                AND a.data_atendimento >= %s 
+                                AND a.data_atendimento <= %s
+                            GROUP BY s.id, s.nome_setor
+                            ORDER BY total DESC
+                        """
+
+            fim_ajustado = f"{data_fim} 23:59:59" if len(data_fim) == 10 else data_fim
+
+            lista_vol_setores = db.execute_query(query_vol_setor, (data_inicio, fim_ajustado), fetch='all')
+
+            dados_extras['volume_por_setor'] = lista_vol_setores
 
             # GRÁFICO ADMIN (Dinâmico)
             query_grafico = """
@@ -2487,3 +2568,688 @@ def api_tipos_por_grupo(grupo_id):
     query = "SELECT id, nome FROM cliente_tipos WHERE grupo_id = %s ORDER BY nome"
     tipos = db.execute_query(query, (grupo_id,), fetch='all') or []
     return jsonify(tipos)
+
+
+# =============================================================================
+# API para Dashboards e Modais (Adiciona Card de atividades do Setor e já contabiliza para um Gráfico)
+# =============================================================================
+
+@app.route('/api/colaboradores_setor')
+@login_required
+def api_colaboradores_setor():
+    """
+    Retorna JSON com a lista de colaboradores ativos de um setor específico.
+    Recebe o parâmetro 'setor' via query string (Ex: ?setor=Financeiro).
+    """
+    nome_setor = request.args.get('setor')
+
+    if not nome_setor:
+        return jsonify([])
+
+    # Query para buscar colaboradores ativos do setor e contar suas atividades totais
+    query = """
+        SELECT c.nome, COUNT(a.id) as total_atividades
+        FROM colaboradores c
+        JOIN setores s ON c.setor_id = s.id
+        LEFT JOIN atividades a ON c.id = a.colaborador_id
+        WHERE s.nome_setor = %s 
+        AND c.status = 'Ativo'
+        GROUP BY c.id, c.nome
+        ORDER BY c.nome ASC
+    """
+
+    try:
+        resultados = db.execute_query(query, (nome_setor,), fetch='all')
+
+        # Tratamento caso não retorne nada (None)
+        if not resultados:
+            return jsonify([])
+
+        # O execute_query retorna dicionários, então podemos passar direto para o jsonify
+        return jsonify(resultados)
+
+    except Exception as e:
+        print(f"Erro na API colaboradores_setor: {e}")
+        return jsonify({'error': 'Erro ao buscar dados'}), 500
+
+
+# =============================================================================
+# ROTAS DO KANBAN
+# =============================================================================
+
+@app.route('/kanban')
+def kanban():
+    # Renderiza a página principal
+    return render_template('kanban.html')
+
+
+# --- 1. ROTAS AUXILIARES (SETORES/TIPOS/COLABORADORES) ---
+
+@app.route('/api/kanban/setores')
+def api_get_setores():
+    print("--- ROTA SETORES ACIONADA ---")  # Debug para ver no terminal
+    try:
+        # CORREÇÃO: Usando 'nome_setor' (conforme sua DDL) e apelidando para 'nome'
+        query = """
+            SELECT s.nome_setor as nome, COUNT(c.id) as qtd_colaboradores 
+            FROM setores s 
+            LEFT JOIN colaboradores c ON s.id = c.setor_id AND c.status = 'Ativo' 
+            GROUP BY s.id, s.nome_setor
+        """
+
+        resultado = db.execute_query(query, fetch='all')
+
+        # Debug: ver o que o banco devolveu
+        print(f"Resultado do Banco: {resultado}")
+
+        # Se vier None, retorna lista vazia
+        if resultado is None:
+            return jsonify([])
+
+        return jsonify(resultado)
+
+    except Exception as e:
+        print(f"!!! ERRO FATAL AO BUSCAR SETORES: {e}")
+        import traceback
+        traceback.print_exc()  # Isso força o erro a aparecer detalhado
+        return jsonify([])
+
+
+@app.route('/api/kanban/tipos_atendimento')
+def api_get_tipos():
+    return jsonify(db.execute_query("SELECT id, nome FROM tipos_atendimento ORDER BY nome ASC", fetch='all'))
+
+
+@app.route('/api/kanban/todos_colaboradores')
+def api_get_todos_colaboradores():
+    try:
+        query = """
+            SELECT c.id, c.nome, s.nome_setor as setor 
+            FROM colaboradores c
+            LEFT JOIN setores s ON c.setor_id = s.id
+            WHERE c.status = 'Ativo'
+            ORDER BY c.nome ASC
+        """
+        dados = db.execute_query(query, fetch='all')
+        return jsonify(dados if dados else [])
+    except Exception as e:
+        print(f"Erro ao buscar colaboradores: {e}")
+        return jsonify([])
+
+
+@app.route('/api/kanban/colaboradores/<path:nome_setor>')
+def api_get_colaboradores_setor(nome_setor):
+    query = """
+        SELECT c.id, c.nome, c.foto_perfil 
+        FROM colaboradores c 
+        INNER JOIN setores s ON c.setor_id = s.id 
+        WHERE s.nome_setor = %s AND c.status = 'Ativo'
+        ORDER BY c.nome ASC
+    """
+    colaboradores = db.execute_query(query, params=(nome_setor,), fetch='all')
+
+    # --- NOVO: Tratamento para gerar a URL correta da imagem ---
+    if colaboradores:
+        for c in colaboradores:
+            if c.get('foto_perfil'):
+                # Transforma 'uploads/...' em '/static/uploads/...'
+                c['foto'] = url_for('static', filename=c['foto_perfil'])
+            else:
+                c['foto'] = None
+    # -----------------------------------------------------------
+
+    return jsonify(colaboradores if colaboradores else [])
+
+
+# --- 2. CRIAR NOVA TAREFA (COM EDITOR RICO, ANEXO E MULTI-RESPONSÁVEL) ---
+@app.route('/api/kanban/nova_tarefa', methods=['POST'])
+def api_criar_tarefa():
+    try:
+        # 1. Captura e Tratamento de Dados Básicos
+        titulo = request.form.get('titulo')
+        descricao = request.form.get('descricao')
+        prioridade_raw = request.form.get('prioridade')
+        prazo = request.form.get('prazo')
+        tipo_id = request.form.get('tipo_atendimento_id')
+        criado_por = session.get('colaborador_id')
+
+        # --- CORREÇÃO DE SEGURANÇA DDL (ENUM) ---
+        # Sua DDL só aceita: 'baixa', 'media', 'alta'.
+        # O HTML envia 'urgente'. Vamos converter para evitar erro de banco.
+        valid_priorities = {'baixa', 'media', 'alta'}
+        if prioridade_raw == 'urgente':
+            prioridade = 'alta'
+        elif prioridade_raw in valid_priorities:
+            prioridade = prioridade_raw
+        else:
+            prioridade = 'media'  # Fallback seguro
+        # ----------------------------------------
+
+        # 2. Processa Responsáveis
+        resp_raw = request.form.get('responsaveis_ids')
+        responsaveis_ids = []
+        if resp_raw:
+            try:
+                responsaveis_ids = json.loads(resp_raw)
+            except:
+                responsaveis_ids = []
+
+        if not responsaveis_ids:
+            return jsonify({'sucesso': False, 'erro': 'Selecione pelo menos um responsável.'}), 400
+
+        # 3. Upload de Arquivo
+        arquivo = request.files.get('arquivo_anexo')
+        caminho_anexo_db = None
+        nome_original_anexo = None
+
+        if arquivo and arquivo.filename:
+            try:
+                filename = secure_filename(arquivo.filename)
+                nome_final = f"{uuid.uuid4()}_{filename}"
+                upload_folder = os.path.join(current_app.root_path, 'static', 'uploads')
+
+                if not os.path.exists(upload_folder):
+                    os.makedirs(upload_folder)
+
+                caminho_completo = os.path.join(upload_folder, nome_final)
+                arquivo.save(caminho_completo)
+
+                caminho_anexo_db = f"static/uploads/{nome_final}"
+                nome_original_anexo = filename
+            except Exception as e:
+                print(f"Erro ao salvar arquivo físico: {e}")
+
+        # 4. Gera Vínculo Único para este lote de tarefas
+        # Sua DDL tem índice em vinculo_id (KEY `idx_vinculo`), então isso será rápido.
+        vinculo_id = str(uuid.uuid4())
+
+        query_tarefa = """
+            INSERT INTO tarefas 
+            (titulo, descricao, status, prioridade, data_prazo, criado_por_id, atribuido_para_id, tipo_atendimento_id, vinculo_id, data_criacao)
+            VALUES (%s, %s, 'a_fazer', %s, %s, %s, %s, %s, %s, NOW())
+        """
+
+        # Query para buscar o ID REAL que acabou de ser gerado (Auto Increment)
+        query_get_id = """
+            SELECT id FROM tarefas 
+            WHERE vinculo_id = %s AND atribuido_para_id = %s 
+            ORDER BY id DESC LIMIT 1
+        """
+
+        query_anexo = """
+            INSERT INTO tarefa_anexos (tarefa_id, nome_arquivo, caminho_arquivo, data_upload) 
+            VALUES (%s, %s, %s, NOW())
+        """
+
+        # 5. Loop de Inserção
+        for resp_id in responsaveis_ids:
+            # A) Insere a Tarefa (Ignoramos o retorno aqui para evitar o erro do 'int object')
+            db.execute_query(query_tarefa, params=(
+                titulo, descricao, prioridade, prazo, criado_por, resp_id, tipo_id, vinculo_id
+            ))
+
+            # B) Busca o ID real gerado pelo banco
+            # Como usamos vinculo_id + atribuido_para_id, é impossível pegar a tarefa errada
+            resultado = db.execute_query(query_get_id, params=(vinculo_id, resp_id), fetch='one')
+
+            nova_tarefa_id = None
+
+            # Tratamento robusto do retorno (seja dict, tupla ou valor direto)
+            if resultado:
+                if isinstance(resultado, dict):
+                    nova_tarefa_id = resultado.get('id')
+                elif isinstance(resultado, (list, tuple)):
+                    nova_tarefa_id = resultado[0]
+                elif isinstance(resultado, int):
+                    nova_tarefa_id = resultado
+
+            # C) Insere o Anexo usando o ID real validado
+            if caminho_anexo_db and nova_tarefa_id:
+                # Agora temos certeza que nova_tarefa_id existe na tabela 'tarefas'
+                # A constraint foreign key não vai falhar
+                db.execute_query(query_anexo, params=(nova_tarefa_id, nome_original_anexo, caminho_anexo_db))
+
+        return jsonify({'sucesso': True})
+
+    except Exception as e:
+        print(f"ERRO CRÍTICO NOVA TAREFA: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+# --- 3. MOVER TAREFA (DRAG & DROP) ---
+
+@app.route('/api/kanban/mover', methods=['POST'])
+def api_mover_tarefa():
+    data = request.json
+    tarefa_id = data.get('id')
+    novo_status = data.get('status')
+
+    # Validação simples
+    if novo_status not in ['a_fazer', 'em_andamento', 'concluido']:
+        return jsonify({'sucesso': False, 'erro': 'Status inválido'}), 400
+
+    if novo_status == 'concluido':
+        q = "UPDATE tarefas SET status = %s, data_conclusao = NOW() WHERE id = %s"
+    else:
+        q = "UPDATE tarefas SET status = %s, data_conclusao = NULL WHERE id = %s"
+
+    db.execute_query(q, params=(novo_status, tarefa_id))
+    return jsonify({'sucesso': True})
+
+
+# --- 4. LISTAR TAREFAS (QUADRO INDIVIDUAL) ---
+
+# --- ALTERAR ESTA ROTA EXISTENTE ---
+@app.route('/api/kanban/tarefas/<int:colaborador_id>')
+def api_get_tarefas_colaborador(colaborador_id):
+    # 1. Busca Tarefas Pendentes (Traz TODAS)
+    query_ativas = """
+        SELECT t.*, 
+            c.nome as criador_nome,
+            (SELECT COUNT(*) FROM tarefa_anexos ta WHERE ta.tarefa_id = t.id) as qtd_anexos,
+            (SELECT COUNT(*) FROM tarefas t2 WHERE t2.vinculo_id = t.vinculo_id AND t.vinculo_id IS NOT NULL) as total_vinculos
+        FROM tarefas t 
+        LEFT JOIN colaboradores c ON t.criado_por_id = c.id
+        WHERE t.atribuido_para_id = %s 
+        AND t.status IN ('a_fazer', 'em_andamento')
+        ORDER BY FIELD(t.status, 'a_fazer', 'em_andamento'), t.data_prazo ASC
+    """
+    ativas = db.execute_query(query_ativas, params=(colaborador_id,), fetch='all') or []
+
+    # 2. Busca APENAS as 5 últimas Concluídas
+    query_concluidas = """
+        SELECT t.*, 
+            c.nome as criador_nome,
+            (SELECT COUNT(*) FROM tarefa_anexos ta WHERE ta.tarefa_id = t.id) as qtd_anexos,
+            (SELECT COUNT(*) FROM tarefas t2 WHERE t2.vinculo_id = t.vinculo_id AND t.vinculo_id IS NOT NULL) as total_vinculos
+        FROM tarefas t 
+        LEFT JOIN colaboradores c ON t.criado_por_id = c.id
+        WHERE t.atribuido_para_id = %s 
+        AND t.status = 'concluido'
+        ORDER BY t.data_conclusao DESC, t.id DESC
+        LIMIT 5
+    """
+    concluidas = db.execute_query(query_concluidas, params=(colaborador_id,), fetch='all') or []
+
+    # Junta as duas listas
+    tarefas = ativas + concluidas
+
+    # ... (MANTENHA AQUI SUA LÓGICA DE PROCESSAMENTO DE DATAS/FLAGS EXISTENTE) ...
+    # Copie exatamente o bloco "hoje = datetime.now().date() ... for t in tarefas: ..." que já existia.
+    # Vou resumir aqui para não ficar gigante, mas você mantém o processamento igual.
+    hoje = datetime.now().date()
+    for t in tarefas:
+        t['atrasada'] = False
+        t['prazo_fmt'] = '-'
+        if t.get('data_prazo'):
+            # (Sua lógica de formatação de data aqui)
+            d = t['data_prazo']
+            if isinstance(d, str):
+                try:
+                    d = datetime.strptime(d, '%Y-%m-%d').date()
+                except:
+                    pass
+            if hasattr(d, 'strftime'):
+                t['prazo_fmt'] = d.strftime('%d/%m')
+                if hasattr(d, 'year') and d < hoje and t['status'] != 'concluido':
+                    t['atrasada'] = True
+
+        t['tem_anexo'] = t.get('qtd_anexos', 0) > 0
+        t['is_compartilhada'] = t.get('total_vinculos', 0) > 1
+
+    return jsonify(tarefas)
+
+
+# --- ADICIONAR ESTA NOVA ROTA ---
+@app.route('/api/kanban/historico_concluidas/<int:colaborador_id>')
+def api_get_historico_concluidas(colaborador_id):
+    # Busca TODAS as concluídas para o modal de histórico
+    query = """
+        SELECT id, titulo, data_conclusao, prioridade
+        FROM tarefas 
+        WHERE atribuido_para_id = %s 
+        AND status = 'concluido'
+        ORDER BY data_conclusao DESC
+    """
+    dados = db.execute_query(query, params=(colaborador_id,), fetch='all')
+
+    # Formata data de conclusão
+    for d in dados:
+        if d.get('data_conclusao'):
+            try:
+                d['data_fmt'] = d['data_conclusao'].strftime('%d/%m/%Y %H:%M')
+            except:
+                d['data_fmt'] = str(d['data_conclusao'])
+        else:
+            d['data_fmt'] = '-'
+
+    return jsonify(dados or [])
+
+
+# --- ROTA ATUALIZADA: TRAZ DETALHES + VÍNCULOS + COMENTÁRIOS ---
+@app.route('/api/kanban/tarefa/<int:tarefa_id>', methods=['GET'])
+def api_get_tarefa_detalhe(tarefa_id):
+    try:
+        # 1. Busca dados da Tarefa Principal
+        query_tarefa = """
+            SELECT t.*, 
+                   c.nome as nome_criador,
+                   ta.id as anexo_id,
+                   ta.nome_arquivo as nome_anexo,
+                   ta.caminho_arquivo as caminho_anexo
+            FROM tarefas t
+            LEFT JOIN colaboradores c ON t.criado_por_id = c.id
+            LEFT JOIN tarefa_anexos ta ON ta.tarefa_id = t.id
+            WHERE t.id = %s
+        """
+        tarefa = db.execute_query(query_tarefa, params=(tarefa_id,), fetch='one')
+
+        if not tarefa:
+            return jsonify({'erro': 'Tarefa não encontrada'}), 404
+
+        # Formata data
+        if tarefa.get('data_prazo'):
+            d = tarefa['data_prazo']
+            if hasattr(d, 'strftime'):
+                tarefa['data_prazo'] = d.strftime('%Y-%m-%d')
+            else:
+                tarefa['data_prazo'] = str(d)
+
+        # 2. Busca Tarefas Vinculadas (Quem mais tem essa tarefa?)
+        # Trazemos status e nome do responsável, excluindo a própria tarefa atual
+        vinculos = []
+        if tarefa.get('vinculo_id'):
+            query_vinculos = """
+                SELECT t.status, c.nome as responsavel
+                FROM tarefas t
+                JOIN colaboradores c ON t.atribuido_para_id = c.id
+                WHERE t.vinculo_id = %s AND t.id != %s
+            """
+            vinculos = db.execute_query(query_vinculos, params=(tarefa['vinculo_id'], tarefa_id), fetch='all')
+
+        # 3. Busca Comentários
+        query_comentarios = """
+            SELECT tc.comentario, tc.data_criacao, c.nome as autor
+            FROM tarefa_comentarios tc
+            JOIN colaboradores c ON tc.colaborador_id = c.id
+            WHERE tc.tarefa_id = %s
+            ORDER BY tc.data_criacao DESC
+        """
+        comentarios = db.execute_query(query_comentarios, params=(tarefa_id,), fetch='all')
+
+        # Formata data dos comentários
+        if comentarios:
+            for com in comentarios:
+                if com.get('data_criacao'):
+                    com['data_fmt'] = com['data_criacao'].strftime('%d/%m às %H:%M')
+
+        # Monta resposta completa
+        tarefa['vinculos'] = vinculos if vinculos else []
+        tarefa['comentarios'] = comentarios if comentarios else []
+
+        return jsonify(tarefa)
+
+    except Exception as e:
+        print(f"Erro ao buscar tarefa {tarefa_id}: {e}")
+        return jsonify({'erro': 'Erro interno'}), 500
+
+
+# --- NOVA ROTA: SALVAR COMENTÁRIO ---
+@app.route('/api/kanban/comentario', methods=['POST'])
+def api_salvar_comentario():
+    try:
+        data = request.json
+        tarefa_id = data.get('tarefa_id')
+        texto = data.get('texto')
+        colab_id = session.get('colaborador_id')  # Pega da sessão logada
+
+        if not texto or not tarefa_id:
+            return jsonify({'sucesso': False, 'erro': 'Texto vazio'})
+
+        query = """
+            INSERT INTO tarefa_comentarios (tarefa_id, colaborador_id, comentario, data_criacao)
+            VALUES (%s, %s, %s, NOW())
+        """
+        db.execute_query(query, params=(tarefa_id, colab_id, texto))
+
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        print(f"Erro comentario: {e}")
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
+# --- 6. KANBAN MASTER (VISÃO GERAL AGRUPADA) ---
+
+@app.route('/api/kanban/master')
+def api_kanban_master():
+    # Busca TUDO que não está arquivado com dados do responsável
+    query = """
+        SELECT t.*, c.nome as responsavel_nome, c.id as responsavel_id, c.foto_perfil
+        FROM tarefas t
+        LEFT JOIN colaboradores c ON t.atribuido_para_id = c.id
+        WHERE t.status != 'arquivado'
+        ORDER BY t.data_prazo ASC
+    """
+    todas_tarefas = db.execute_query(query, fetch='all')
+    tarefas_agrupadas = {}
+    hoje = datetime.now().date()
+
+    if not todas_tarefas:
+        return jsonify([])
+
+    for t in todas_tarefas:
+        # Agrupa pelo vinculo_id se existir, senão pelo id único
+        chave = t['vinculo_id'] if t.get('vinculo_id') else str(t['id'])
+
+        # --- NOVO: Lógica da Foto ---
+        link_foto = None
+        if t.get('foto_perfil'):
+            link_foto = url_for('static', filename=t['foto_perfil'])
+        # ----------------------------
+
+        responsavel = {
+            'id': t['responsavel_id'],
+            'nome': t['responsavel_nome'] or '?',
+            'foto': link_foto # Agora enviamos a URL pronta
+        }
+
+        if chave not in tarefas_agrupadas:
+            # Formatação de data (igual ao individual)
+            prazo_fmt = '-'
+            atrasada = False
+            if t.get('data_prazo'):
+                d = t['data_prazo']
+                if isinstance(d, str):
+                    try:
+                        d = datetime.strptime(d, '%Y-%m-%d').date()
+                    except:
+                        pass
+
+                if hasattr(d, 'strftime'):
+                    prazo_fmt = d.strftime('%d/%m')
+                    if hasattr(d, 'year') and d < hoje and t['status'] != 'concluido':
+                        atrasada = True
+
+            tarefas_agrupadas[chave] = {
+                'id': t['id'],
+                'vinculo_id': t.get('vinculo_id'),
+                'titulo': t['titulo'],
+                'descricao': t['descricao'],
+                'prioridade': t['prioridade'],
+                'status': t['status'],
+                'prazo_fmt': prazo_fmt,
+                'atrasada': atrasada,
+                'equipe': [responsavel]
+            }
+        else:
+            # Verifica se esse responsável já não está na lista (evita duplicados visuais)
+            ids_existentes = [m['id'] for m in tarefas_agrupadas[chave]['equipe']]
+            if responsavel['id'] not in ids_existentes:
+                tarefas_agrupadas[chave]['equipe'].append(responsavel)
+
+    return jsonify(list(tarefas_agrupadas.values()))
+
+
+@app.route('/api/kanban/editar_tarefa', methods=['POST'])
+@login_required
+def editar_tarefa():
+    try:
+        data = request.get_json()
+
+        # 1. Pega os dados
+        t_id = data.get('id')
+        titulo = data.get('titulo')
+        descricao = data.get('descricao')  # HTML do Quill
+        prioridade = data.get('prioridade')
+        prazo = data.get('prazo')
+        tipo_id = data.get('tipo_atendimento_id')
+
+        # Validação básica
+        if not t_id or not titulo:
+            return jsonify({'sucesso': False, 'erro': 'Dados obrigatórios faltando'})
+
+        # 2. Tratamento de Nulos
+        if not prazo:
+            prazo = None
+
+        if not tipo_id or tipo_id == "":
+            tipo_id = None
+
+        # Garante prioridade válida
+        if prioridade not in ['baixa', 'media', 'alta']:
+            prioridade = 'media'
+
+        # 3. SQL DE ATUALIZAÇÃO
+        sql = """
+            UPDATE tarefas 
+            SET titulo = %s, 
+                descricao = %s, 
+                prioridade = %s, 
+                data_prazo = %s, 
+                tipo_atendimento_id = %s
+            WHERE id = %s
+        """
+
+        # Parâmetros
+        params = (titulo, descricao, prioridade, prazo, tipo_id, t_id)
+
+        # --- A CORREÇÃO ESTÁ AQUI ---
+        # Usamos db.execute_query igual nas outras rotas
+        # Não precisa de fetch='all' pois é um UPDATE
+        db.execute_query(sql, params=params)
+
+        return jsonify({'sucesso': True})
+
+    except Exception as e:
+        print(f"ERRO AO EDITAR TAREFA: {e}")  # Log no terminal
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
+@app.route('/api/kanban/excluir', methods=['POST'])
+@login_required
+def api_excluir_tarefa():
+    try:
+        data = request.json
+        tarefa_id = data.get('id')
+
+        if not tarefa_id:
+            return jsonify({'sucesso': False, 'erro': 'ID inválido'})
+
+        # O ON DELETE CASCADE do seu banco cuidará dos anexos e comentários
+        query = "DELETE FROM tarefas WHERE id = %s"
+
+        # Executa a exclusão
+        db.execute_query(query, params=(tarefa_id,))
+
+        return jsonify({'sucesso': True})
+
+    except Exception as e:
+        print(f"Erro ao excluir tarefa: {e}")
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
+# =============================================================================
+# ROTAS DE NOTIFICAÇÕES (BASEADO EM PENDÊNCIAS)
+# =============================================================================
+
+@app.route('/api/notificacoes/contar')
+def api_notificacoes_contar():
+    colab_id = session.get('colaborador_id')
+    if not colab_id:
+        return jsonify({'total': 0, 'criticas': 0})
+
+    try:
+        # Lógica: Conta tarefas ativas (A Fazer/Em Andamento)
+        # Criticas: São as de prioridade ALTA ou que já venceram (prazo < hoje)
+        query = """
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE 
+                    WHEN prioridade = 'alta' OR (data_prazo < CURDATE() AND data_prazo IS NOT NULL) 
+                    THEN 1 ELSE 0 
+                END) as criticas
+            FROM tarefas
+            WHERE atribuido_para_id = %s 
+              AND status IN ('a_fazer', 'em_andamento')
+        """
+
+        resultado = db.execute_query(query, params=(colab_id,), fetch='one')
+
+        total = resultado['total'] if resultado else 0
+        criticas = resultado['criticas'] if resultado and resultado['criticas'] else 0
+
+        # O Decimal do SQL pode dar erro no JSON, convertemos para int/float
+        return jsonify({
+            'total': int(total),
+            'criticas': int(criticas)
+        })
+
+    except Exception as e:
+        print(f"Erro ao contar notificacoes: {e}")
+        return jsonify({'total': 0, 'criticas': 0})
+
+
+@app.route('/api/notificacoes/listar')
+def api_notificacoes_listar():
+    colab_id = session.get('colaborador_id')
+    if not colab_id:
+        return jsonify([])
+
+    try:
+        # Busca as tarefas pendentes para popular o dropdown
+        # Prioriza: Urgentes primeiro, depois as mais antigas
+        query = """
+            SELECT id, titulo, data_prazo, prioridade
+            FROM tarefas
+            WHERE atribuido_para_id = %s 
+              AND status IN ('a_fazer', 'em_andamento')
+            ORDER BY 
+                FIELD(prioridade, 'alta', 'media', 'baixa'), -- Alta aparece antes
+                data_prazo ASC -- Prazos mais curtos aparecem antes
+            LIMIT 7
+        """
+
+        tarefas = db.execute_query(query, params=(colab_id,), fetch='all')
+
+        # Tratamento de datas para JSON (ISO format YYYY-MM-DD para o JS ler)
+        lista_formatada = []
+        if tarefas:
+            for t in tarefas:
+                prazo_str = ""
+                if t.get('data_prazo'):
+                    # Garante que seja string YYYY-MM-DD
+                    prazo_str = str(t['data_prazo'])
+
+                lista_formatada.append({
+                    'id': t['id'],
+                    'titulo': t['titulo'],
+                    'prioridade': t['prioridade'],
+                    'data_prazo': prazo_str
+                })
+
+        return jsonify(lista_formatada)
+
+    except Exception as e:
+        print(f"Erro ao listar notificacoes: {e}")
+        return jsonify([])
