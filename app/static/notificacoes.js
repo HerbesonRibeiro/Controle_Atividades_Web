@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     btn.classList.remove('bell-urgent');
                 }
             })
-            .catch(err => console.warn("Erro conexao notificacao")); // Silencioso
+            .catch(err => console.warn("Erro conexao notificacao"));
     }
 
     // --- 2. LÓGICA DA LISTA (EVENTO DO BOOTSTRAP) ---
@@ -40,18 +40,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const listaSino = document.getElementById('lista-notificacoes');
 
     if (btnSino && listaSino) {
-        // AQUI ESTÁ O SEGREDO: Ouvimos o evento do Bootstrap, não o click manual.
-        // Isso impede que o menu trave ou abra duas vezes.
         btnSino.addEventListener('show.bs.dropdown', function () {
 
-            // 1. Reseta para "Buscando..." sempre que abrir
             listaSino.innerHTML = '<li class="p-3 text-center text-muted"><i class="fas fa-spinner fa-spin"></i> Buscando...</li>';
 
-            // 2. Busca os dados
             fetch('/api/notificacoes/listar')
                 .then(res => res.json())
                 .then(tarefas => {
-                    listaSino.innerHTML = ''; // Limpa o carregando
+                    listaSino.innerHTML = '';
 
                     if (!tarefas || tarefas.length === 0) {
                         listaSino.innerHTML = '<li class="p-3 text-center text-muted">Tudo em dia! 🎉</li>';
@@ -61,27 +57,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     listaSino.innerHTML += '<li><h6 class="dropdown-header">Pendências</h6></li>';
 
                     tarefas.forEach(t => {
-                        // Proteção contra dados nulos
                         let titulo = t.titulo || 'Sem título';
                         let dataStr = t.data_prazo || '';
                         let prioridade = (t.prioridade || '').toLowerCase();
-
-                        // Lógica Visual
                         let hoje = new Date().toISOString().split('T')[0];
                         let isCritico = (prioridade === 'alta' || (dataStr && dataStr < hoje));
-                        let icone = isCritico ? '🔥' : '🔹';
                         let corTexto = isCritico ? 'text-danger fw-bold' : 'text-dark';
 
-                        // Formata Data
                         let dataFmt = 'S/ Prazo';
                         if (dataStr) {
                             try { dataFmt = dataStr.split('-').reverse().slice(0, 2).join('/'); } catch(e){}
                         }
 
-                        // HTML Blindado contra quebra de layout
+                        // --- O SEGREDO ESTÁ AQUI ---
+                        // Adicionamos 'meus=1' para avisar o Kanban que queremos ver a tela pessoal
+                        // Adicionamos 't_id' para abrir o modal
+                        let linkDestino = `/kanban?meus=1&t_id=${t.id}`;
+                        // ---------------------------
+
                         listaSino.innerHTML += `
                             <li>
-                                <a class="dropdown-item d-flex gap-2 align-items-center py-2" href="/kanban?t_id=${t.id}">
+                                <a class="dropdown-item d-flex gap-2 align-items-center py-2" href="${linkDestino}">
                                     <div style="overflow:hidden; width:100%">
                                         <div class="${corTexto} text-truncate-notify" title="${titulo}">
                                             ${titulo}
@@ -105,5 +101,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Inicialização
     atualizarContador();
-    setInterval(atualizarContador, 120000); // 2 minutos
+    setInterval(atualizarContador, 120000);
 });

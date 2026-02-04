@@ -1152,3 +1152,65 @@ function verificarNovidades() {
         });
     }
 }
+// ==========================================
+// 15. AUTO-DIRECIONAMENTO (NOTIFICAÇÃO -> MEU QUADRO)
+// ==========================================
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+
+    // Verifica se veio da notificação com o sinal 'meus=1'
+    if (params.get('meus') === '1') {
+        console.log("Modo Notificação: Carregando meu quadro...");
+
+        const myId = document.getElementById('usuario_logado_id')?.value;
+        const myName = document.getElementById('usuario_logado_nome')?.value || 'Meu Quadro';
+
+        if (myId) {
+            // Chama a função que carrega o quadro
+            carregarKanban(myId, myName);
+
+            // Se tiver ID de tarefa, abre o modal com correção de bug
+            const tId = params.get('t_id');
+            if (tId) {
+                setTimeout(() => {
+                    if (typeof editarTarefa === 'function') {
+                        // 1. Abre o modal
+                        editarTarefa(tId);
+
+                        // --- CORREÇÃO DO BUG DA TELA TRAVADA ---
+                        // Adiciona um evento para limpar o fundo cinza quando ESSE modal fechar
+                        const modalEl = document.getElementById('modalEditarTarefa');
+                        if (modalEl) {
+                            modalEl.addEventListener('hidden.bs.modal', function () {
+                                // Remove forçadamente qualquer backdrop que tenha sobrado
+                                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                                // Remove a classe que trava o scroll do corpo
+                                document.body.classList.remove('modal-open');
+                                document.body.style.overflow = '';
+                                document.body.style.paddingRight = '';
+                            }, { once: true }); // { once: true } garante que roda só nesta vez automática
+                        }
+                    }
+                    // Limpa a URL
+                    window.history.replaceState({}, '', '/kanban');
+                }, 800);
+            }
+        } else {
+            console.warn("ATENÇÃO: ID do usuário logado não encontrado.");
+        }
+    }
+});
+// ==========================================
+// 16. BOTÃO "MINHAS TAREFAS" (MANUAL)
+// ==========================================
+function irParaMeuQuadro() {
+    const myId = document.getElementById('usuario_logado_id')?.value;
+    const myName = document.getElementById('usuario_logado_nome')?.value || 'Meu Quadro';
+
+    if (myId) {
+        // Usa a sua função nativa para carregar e trocar a tela
+        carregarKanban(myId, myName);
+    } else {
+        Swal.fire('Erro', 'Não foi possível identificar seu usuário.', 'error');
+    }
+}

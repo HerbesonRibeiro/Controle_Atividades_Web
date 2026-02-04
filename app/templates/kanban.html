@@ -26,6 +26,10 @@
             <button id="btn-master" class="btn btn-primary btn-sm rounded-pill px-3" onclick="carregarVisaoMaster()">
                 <i class="fas fa-globe-americas me-1"></i> Visão Geral
             </button>
+
+            <button id="btn-meus" class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="irParaMeuQuadro()">
+                <i class="fas fa-user-check me-1"></i> Minhas Tarefas
+            </button>
         </div>
         <button id="btn-voltar" class="btn btn-outline-secondary btn-sm" style="display: none;" onclick="voltar()">
             <i class="fas fa-arrow-left me-1"></i> Voltar
@@ -269,7 +273,8 @@
         </div>
     </div>
 </div>
-
+<input type="hidden" id="usuario_logado_id" value="{{ session['colaborador_id'] }}">
+<input type="hidden" id="usuario_logado_nome" value="{{ session['colaborador_nome'] }}">
 <script src="{{ url_for('static', filename='kanban.js') }}"></script>
 
 {% endblock %}
